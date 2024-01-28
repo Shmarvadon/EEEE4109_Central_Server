@@ -20,6 +20,12 @@ class server {
 public:
 
 	server();
+
+	~server() { _UDPListenerThread.join(); };
+
+	pole& getPole(int i) { return _poles[i]; }
+
+	uint32_t numberOfPoles() { return _poles.size(); }
 private:
 
 	std::thread _UDPListenerThread;

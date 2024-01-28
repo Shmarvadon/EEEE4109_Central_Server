@@ -1,8 +1,14 @@
 #include "Server.hpp"
 
+
+
+
 std::mutex m;
 
 void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_t> TCPportsrange) {
+
+	std::vector<std::thread> poleThreads;
+
 #ifdef _DEBUG
 	std::cout << "Setting up UDP listner thread.\n";
 #endif // _DEBUG
@@ -99,10 +105,8 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 		std::cout << "Recieved a UDP broadcast from a pole.\n";
 #endif // _DEBUG
 
-
-
 		//  Recieve the broadcast.
-		std::lock_guard<std::mutex> lock(m);
+		std::lock_guard<std::mutex> lock(m);	// Acquire mutex lock untill scope exit to ensure no memory access clashes
 		json handshake_data;
 		try {
 			handshake_data = json::parse(listnerBuff);
@@ -115,15 +119,25 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 #endif // _DEBUG
 
 		// Obtain a port that is usable for TCP.
-		uint32_t polePort = (TCPportsrange.first + poles->size() < TCPportsrange.second) ? TCPportsrange.first + poles->size() : throw std::runtime_error("Ran out of valid ports to use.");
+		uint32_t polePort = (TCPportsrange.first + poles->size() < TCPportsrange.second) ? TCPportsrange.first + poles->size() : throw std::runtime_error("Ran out of valid TCP ports to use.");
 
 		// Obtain a session ID for the pole.
 		uint32_t poleSessionId = poles->size();
+
+#ifdef _DEBUG
+		std::cout << "Parameters for pole configuration:\n\tTCP port: " << polePort << "\n\tSession id: " << poleSessionId << "\n";
+#endif // _DEBUG
 
 
 		// Pack reply data into buffer.
 		memcpy(senderBuff, &polePort, sizeof(uint32_t));
 		memcpy(&senderBuff[4], &poleSessionId, sizeof(uint32_t));
+
+		// Construct the new class in place.
+		poles->emplace_back(pole(polePort, poleSessionId, std::stoi((std::string)handshake_data.at("HWID"))));
+
+		// Run its function to setup TCP port and continually listen in perpetuity.
+		poleThreads.emplace_back(std::thread(&pole::operator(), &poles->at(poles->size()-1)));	// That & before the 2nd arg of std::thread() caused me 2 hours of debugging wondering why I had 2 instances of the same instance...
 
 		// Send the reply.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;
@@ -132,6 +146,12 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 			WSACleanup();
 			throw std::runtime_error("Unable to send data over UDP socket.");
 		}
+		
+	}
+
+	// Terminate threads handling incomming messages from poles.
+	for (auto& th : poleThreads) {
+		th.join();
 	}
 }
 
@@ -140,8 +160,6 @@ server::server() {
 	try {
 		int port = 6309;
 		_UDPListenerThread = std::thread(UDPListener, port, &_poles, TCPportsrange);
-
-		_UDPListenerThread.join();
 	}
 	catch (std::runtime_error e) {
 		std::cout << e.what();
