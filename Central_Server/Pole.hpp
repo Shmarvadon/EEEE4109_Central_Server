@@ -8,6 +8,18 @@
 
 #define TCP_BUFF_SIZE 128
 
+struct polestate {
+	float velostatCurrent;
+	uint16_t IRFrequency;
+	float jerkThreashold;
+	float batteryVoltage;
+
+	bool IROn;
+	bool VelostatOn;
+
+};
+
+
 class pole {
 public:
 

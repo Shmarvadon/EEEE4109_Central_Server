@@ -21,7 +21,7 @@ public:
 
 	server();
 
-	~server() { _UDPListenerThread.join(); };
+	~server();
 
 	pole& getPole(int i) { return _poles[i]; }
 

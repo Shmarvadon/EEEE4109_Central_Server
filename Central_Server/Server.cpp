@@ -149,10 +149,16 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 		
 	}
 
+	/*   Thread termination cleanup   */
+
 	// Terminate threads handling incomming messages from poles.
 	for (auto& th : poleThreads) {
 		th.join();
 	}
+
+	// close the sockets.
+	closesocket(UDPListener);
+	closesocket(UDPSender);
 }
 
 server::server() {
@@ -166,3 +172,8 @@ server::server() {
 	}
 }
 
+server::~server() {
+	_UDPListenerThread.join();
+
+	WSACleanup();
+}
