@@ -1,14 +1,8 @@
 #include "Server.hpp"
 
-
-
-
 std::mutex m;
 
-void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_t> TCPportsrange) {
-
-	std::vector<std::thread> poleThreads;
-
+void server::_UDPListner() {
 #ifdef _DEBUG
 	std::cout << "Setting up UDP listner thread.\n";
 #endif // _DEBUG
@@ -21,7 +15,7 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 
 	sockaddr_in listnerRecvAddr;
 	listnerRecvAddr.sin_family = AF_INET;
-	listnerRecvAddr.sin_port = htons(port);
+	listnerRecvAddr.sin_port = htons(_UDPListnerPort);
 	listnerRecvAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	WSABUF listnerDataBuff;
@@ -55,13 +49,13 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 
 	sockaddr_in senderRecieverAddress;
 	senderRecieverAddress.sin_family = AF_INET;
-	senderRecieverAddress.sin_port = htons(port - 1);
+	senderRecieverAddress.sin_port = htons(_UDPListnerPort - 1);
 	
 
 	sockaddr_in senderLocalAddr;
 	senderLocalAddr.sin_family = AF_INET;
 	senderLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	senderLocalAddr.sin_port = htons(port - 1);
+	senderLocalAddr.sin_port = htons(_UDPListnerPort - 1);
 
 	{
 		UDPSender = WSASocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, NULL, 0, NULL);
@@ -119,10 +113,10 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 #endif // _DEBUG
 
 		// Obtain a port that is usable for TCP.
-		uint32_t polePort = (TCPportsrange.first + poles->size() < TCPportsrange.second) ? TCPportsrange.first + poles->size() : throw std::runtime_error("Ran out of valid TCP ports to use.");
+		uint32_t polePort = (TCPportsrange.first + _poles.size() < TCPportsrange.second) ? TCPportsrange.first + _poles.size() : throw std::runtime_error("Ran out of valid TCP ports to use.");
 
 		// Obtain a session ID for the pole.
-		uint32_t poleSessionId = poles->size();
+		uint32_t poleSessionId = _poles.size();
 
 #ifdef _DEBUG
 		std::cout << "Parameters for pole configuration:\n\tTCP port: " << polePort << "\n\tSession id: " << poleSessionId << "\n";
@@ -133,11 +127,8 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 		memcpy(senderBuff, &polePort, sizeof(uint32_t));
 		memcpy(&senderBuff[4], &poleSessionId, sizeof(uint32_t));
 
-		// Construct the new class in place.
-		poles->emplace_back(pole(polePort, poleSessionId, std::stoi((std::string)handshake_data.at("HWID"))));
-
-		// Run its function to setup TCP port and continually listen in perpetuity.
-		poleThreads.emplace_back(std::thread(&pole::operator(), &poles->at(poles->size()-1)));	// That & before the 2nd arg of std::thread() caused me 2 hours of debugging wondering why I had 2 instances of the same instance...
+		// Place pointer to pole class into vector, it CAN NOT be the pole itself as SOCKET & std::thread dont play nicely with move or copying and I CBA to put in the effort to properly design the class.
+		_poles.emplace_back(new pole(polePort, poleSessionId, std::stoi((std::string)handshake_data.at("HWID"))));
 
 		// Send the reply.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;
@@ -151,25 +142,9 @@ void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_
 
 	/*   Thread termination cleanup   */
 
-	// Terminate threads handling incomming messages from poles.
-	for (auto& th : poleThreads) {
-		th.join();
-	}
-
 	// close the sockets.
 	closesocket(UDPListener);
 	closesocket(UDPSender);
-}
-
-server::server() {
-
-	try {
-		int port = 6309;
-		_UDPListenerThread = std::thread(UDPListener, port, &_poles, TCPportsrange);
-	}
-	catch (std::runtime_error e) {
-		std::cout << e.what();
-	}
 }
 
 server::~server() {

@@ -19,21 +19,24 @@ using json = nlohmann::json;
 class server {
 public:
 
-	server();
+	server() : _UDPListnerPort(42069), TCPportsrange({ 2000,3000 }), _UDPListenerThread(&server::_UDPListner,  this) {
+		
+	};
 
 	~server();
 
-	pole& getPole(int i) { return _poles[i]; }
+	pole& getPole(int i) { return *_poles[i]; }
 
 	uint32_t numberOfPoles() { return _poles.size(); }
 private:
 
+	void _UDPListner();
+
 	std::thread _UDPListenerThread;
+	int _UDPListnerPort;
 
-	std::vector<pole> _poles;
+	std::vector<pole*> _poles;
 
-	std::pair<uint32_t, uint32_t> TCPportsrange = { 2000,3000 };
+	std::pair<uint32_t, uint32_t> TCPportsrange;
 };
 
-
-void UDPListener(int port, std::vector<pole>* poles, std::pair<uint32_t, uint32_t> TCPportsrange);

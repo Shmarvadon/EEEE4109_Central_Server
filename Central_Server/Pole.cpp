@@ -1,10 +1,5 @@
 #include "Pole.hpp"
 
-pole::pole(int port, uint32_t id, uint32_t hwid) : _id(id), _TCPPort(port), _HWID(hwid) {};
-
-pole::~pole() {
-	closesocket(_TCPSocket);
-}
 
 void pole::sendData(std::string data) {
 
@@ -17,7 +12,7 @@ void pole::sendData(std::string data) {
 	}
 }
 
-void pole::_setupTCPSocket(int port) {
+void pole::_setupTCPSocket() {
 
 	SOCKET listeningSocket = INVALID_SOCKET;
 	addrinfo* result = NULL, hints;
@@ -32,7 +27,7 @@ void pole::_setupTCPSocket(int port) {
 	hints.ai_flags = AI_PASSIVE;
 
 	// get the reply from WinSock on the actual parameters that we can use.
-	if (getaddrinfo(NULL, std::to_string(port).c_str(), &hints, &result) != 0) {
+	if (getaddrinfo(NULL, std::to_string(_TCPPort).c_str(), &hints, &result) != 0) {
 		WSACleanup();
 		throw std::runtime_error("Failed to get addrinfo for pole TCP comms port.");
 	}
@@ -74,6 +69,9 @@ void pole::_setupTCPSocket(int port) {
 	std::cout << "Accepted TCP connection.\n";
 
 	if (_TCPSocket == INVALID_SOCKET) std::cout << "Something went wrong with TCP Socket.\n";
+
+	// Call the main loop.
+	_main();
 }
 
 void pole::_main() {
