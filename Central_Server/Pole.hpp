@@ -43,6 +43,28 @@ public:
 
 	void sendData(std::string data);
 
+	void pollSensors();
+
+	void pollSensor(uint8_t sensor);
+
+	void pollState();
+
+	/*   Methods for setting and updating stuff   */		// THESE ARE INCOMPLETE IMPLIMENT THEM ANOTHER TIME.
+
+	void setVelostatCurrent(float current);
+
+	float getVelostatCurrent();
+
+	float getBatteryLife();
+
+	bool getVelostatState();
+
+	void setVelostatState(bool state);
+
+	bool getIRState();
+
+	void setIRState(bool state);
+
 private:
 
 	void _setupTCPSocket();

@@ -11,7 +11,7 @@ void server::_UDPListner() {
 	SOCKET UDPListener = INVALID_SOCKET;
 
 	char listnerBuff[UDP_BUFF_SIZE];
-	ZeroMemory(&listnerBuff, sizeof(char) * UDP_BUFF_SIZE);
+	ZeroMemory(listnerBuff, sizeof(char) * UDP_BUFF_SIZE);
 
 	sockaddr_in listnerRecvAddr;
 	listnerRecvAddr.sin_family = AF_INET;
@@ -83,8 +83,8 @@ void server::_UDPListner() {
 	/*   Listen for UDP broadcasts   */
 	
 	while (true) {
-		ZeroMemory(&listnerBuff, sizeof(char) * UDP_BUFF_SIZE);
-		ZeroMemory(&senderBuff, sizeof(char) * UDP_BUFF_SIZE);
+		ZeroMemory(listnerBuff, sizeof(char) * UDP_BUFF_SIZE);
+		ZeroMemory(senderBuff, sizeof(char) * UDP_BUFF_SIZE);
 
 		// If there is an error that isnt an IO pending.
 		if (WSARecvFrom(UDPListener, &listnerDataBuff, 1, &listnerBytesReceived, &listnerFlags, (SOCKADDR*)&listnerSenderAddress, &listnerSenderAddressSize, NULL, NULL) != 0) {

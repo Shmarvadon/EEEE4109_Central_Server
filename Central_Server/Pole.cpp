@@ -78,17 +78,16 @@ void pole::_main() {
 
 	int nBytesReceived;
 	while (true) {
+		ZeroMemory(_TCPCommsBuffer, TCP_BUFF_SIZE);
 		nBytesReceived = recv(_TCPSocket, _TCPCommsBuffer, TCP_BUFF_SIZE, 0);
 #ifdef _DEBUG
 		if (nBytesReceived > 0) {
 			std::cout << "Recieved data from pole " << _id << "\n";
 			std::cout << _TCPCommsBuffer << std::endl;
-			ZeroMemory(_TCPCommsBuffer, TCP_BUFF_SIZE);
-			strcpy(_TCPCommsBuffer, "Hello There Pole ");
-			std::strcat(_TCPCommsBuffer, (char*)std::to_string(_id).c_str());
-			std::strcat(_TCPCommsBuffer, ".");
-			std::cout << "Replying with: " << _TCPCommsBuffer << std::endl;
-			send(_TCPSocket, _TCPCommsBuffer, TCP_BUFF_SIZE, 0);
+			std::string tmp = "Hello there pole " + std::to_string(_id) + ".";
+
+			std::cout << "Replying with: " << tmp << std::endl;
+			send(_TCPSocket, tmp.c_str(), tmp.length(), 0);
 		}
 
 #endif // _DEBUG
