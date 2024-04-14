@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/PoleDiagram">
+        <file>EEEE4109_Master_Pole_UI_Drawing.png</file>
+        <file>EEEE4109_Slave_Pole_UI_Drawing.png</file>
+    </qresource>
+</RCC>
