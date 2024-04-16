@@ -2,7 +2,7 @@
 
 #include "pole.h"
 
-#define UDP_BUFF_SIZE 128
+#define UDP_BUFF_SIZE 512
 
 class PoleDataModel;
 
@@ -54,13 +54,14 @@ public:
 
     /*			My Methods :)			*/
 public slots:
+
+    // From UDP listner thread.
     void appendNewPole(int port, int sessionId, uint64_t HWID, uint8_t type);
 
+    // From Pole class.
     void updateVisual(){ dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole }); }
 
 signals:
-
-    void ToPole();
 
 private:
 

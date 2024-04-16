@@ -193,8 +193,7 @@ void udplistnerthread::run() {
 		memcpy(&poleHWID, &listnerBuff[0], sizeof(uint64_t));
 
 		// Obtain the poles type.
-		uint8_t poleType;
-		memcpy(&poleType, &listnerBuff[8], sizeof(uint8_t));
+		uint8_t poleType = listnerBuff[8];
 
 		// Pack reply data into buffer.
 		memcpy(senderBuff, &polePort, sizeof(uint32_t));

@@ -4,6 +4,10 @@
 #include <QMainWindow>
 #include "polelist.h"
 
+
+#include <QDebug>
+
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -18,8 +22,18 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+public slots:
+
+    void handleTreeViewClicked();
+
+    void handlePolePositionInput() {};
+    void handleIRFrequencyInput() {};
+    void handleTouchSensitivityInput() {};
+    void handleIMUSensitivityInput() {};
+
 private:
     Ui::MainWindow *_ui;
     PoleDataModel* _poleList;
+    Pole* _currentlySelectedPole = nullptr;
 };
 #endif // MAINWINDOW_H

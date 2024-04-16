@@ -43,7 +43,7 @@ public:
     QWidget *nopoleselectedview;
     QLabel *label;
     QWidget *poleselectedview;
-    QStackedWidget *stackedWidget_2;
+    QStackedWidget *PoleDiagramView;
     QWidget *masterpole;
     QLabel *label_2;
     QWidget *slavepole;
@@ -82,7 +82,7 @@ public:
     QHBoxLayout *horizontalLayout_4;
     QLabel *label_7;
     QSpacerItem *horizontalSpacer_3;
-    QLineEdit *lineEdit_3;
+    QLineEdit *PolePositionBox;
     QHBoxLayout *horizontalLayout_5;
     QLabel *label_8;
     QSpacerItem *horizontalSpacer_4;
@@ -140,10 +140,17 @@ public:
         treeView = new QTreeView(layoutWidget);
         treeView->setObjectName("treeView");
         treeView->setMaximumSize(QSize(510, 16777215));
+        treeView->setLayoutDirection(Qt::LeftToRight);
         treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         treeView->setAlternatingRowColors(true);
         treeView->setSelectionBehavior(QAbstractItemView::SelectRows);
         treeView->setTextElideMode(Qt::ElideMiddle);
+        treeView->setIndentation(0);
+        treeView->setRootIsDecorated(false);
+        treeView->setUniformRowHeights(true);
+        treeView->setItemsExpandable(false);
+        treeView->setHeaderHidden(false);
+        treeView->header()->setStretchLastSection(false);
 
         horizontalLayout_2->addWidget(treeView);
 
@@ -163,16 +170,16 @@ public:
         PoleStatusViewSection->addWidget(nopoleselectedview);
         poleselectedview = new QWidget();
         poleselectedview->setObjectName("poleselectedview");
-        stackedWidget_2 = new QStackedWidget(poleselectedview);
-        stackedWidget_2->setObjectName("stackedWidget_2");
-        stackedWidget_2->setGeometry(QRect(-10, 0, 201, 949));
+        PoleDiagramView = new QStackedWidget(poleselectedview);
+        PoleDiagramView->setObjectName("PoleDiagramView");
+        PoleDiagramView->setGeometry(QRect(-10, 0, 201, 949));
         masterpole = new QWidget();
         masterpole->setObjectName("masterpole");
         label_2 = new QLabel(masterpole);
         label_2->setObjectName("label_2");
         label_2->setGeometry(QRect(0, 0, 191, 951));
         label_2->setAlignment(Qt::AlignCenter);
-        stackedWidget_2->addWidget(masterpole);
+        PoleDiagramView->addWidget(masterpole);
         slavepole = new QWidget();
         slavepole->setObjectName("slavepole");
         label_3 = new QLabel(slavepole);
@@ -180,7 +187,7 @@ public:
         label_3->setGeometry(QRect(0, 0, 191, 951));
         label_3->setLayoutDirection(Qt::RightToLeft);
         label_3->setAlignment(Qt::AlignCenter);
-        stackedWidget_2->addWidget(slavepole);
+        PoleDiagramView->addWidget(slavepole);
         label_4 = new QLabel(poleselectedview);
         label_4->setObjectName("label_4");
         label_4->setGeometry(QRect(-10, 0, 671, 71));
@@ -373,14 +380,14 @@ public:
 
         horizontalLayout_4->addItem(horizontalSpacer_3);
 
-        lineEdit_3 = new QLineEdit(layoutWidget1);
-        lineEdit_3->setObjectName("lineEdit_3");
-        sizePolicy.setHeightForWidth(lineEdit_3->sizePolicy().hasHeightForWidth());
-        lineEdit_3->setSizePolicy(sizePolicy);
-        lineEdit_3->setMaximumSize(QSize(70, 16777215));
-        lineEdit_3->setBaseSize(QSize(50, 0));
+        PolePositionBox = new QLineEdit(layoutWidget1);
+        PolePositionBox->setObjectName("PolePositionBox");
+        sizePolicy.setHeightForWidth(PolePositionBox->sizePolicy().hasHeightForWidth());
+        PolePositionBox->setSizePolicy(sizePolicy);
+        PolePositionBox->setMaximumSize(QSize(70, 16777215));
+        PolePositionBox->setBaseSize(QSize(50, 0));
 
-        horizontalLayout_4->addWidget(lineEdit_3, 0, Qt::AlignLeft);
+        horizontalLayout_4->addWidget(PolePositionBox, 0, Qt::AlignLeft);
 
 
         verticalLayout->addLayout(horizontalLayout_4);
@@ -584,7 +591,7 @@ public:
         retranslateUi(MainWindow);
 
         PoleStatusViewSection->setCurrentIndex(1);
-        stackedWidget_2->setCurrentIndex(0);
+        PoleDiagramView->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(MainWindow);
