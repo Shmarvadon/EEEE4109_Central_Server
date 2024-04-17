@@ -18,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(_ui->treeView, &QTreeView::clicked, this, &MainWindow::handleTreeViewClicked);
 
     _ui->PoleStatusViewSection->setCurrentIndex(0);
-
+    _ui->PoleKnocked->setChecked(true);
 }
 
 
@@ -73,7 +73,16 @@ void MainWindow::handleTreeViewClicked() {
     connect(_ui->TouchSensitivityInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleTouchSensitivityInput);
     connect(_ui->IMUSensitivityInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleIMUSensitivityInput);
     
-    
-    //_ui->IMUSensitivityInputBox->setText()
-}
+    _ui->PoleKnocked->setCheckable(true);
+    _ui->PoleKnocked->setChecked(true);
+    //_ui->PoleKnocked->setCheckable(false);
+    //_ui->PassageDirection->setChecked(true);
+    _ui->PassageDirection->setCheckable(false);
+    //_ui->PassageDirection->setDown(true);
 
+    QIcon icon = QIcon(":/EventsIndicatorIcons/App_Events_Icons.png");
+    _ui->PassageDirection->setIcon(icon);
+
+    //_ui->PoleKnocked->setEnabled(false);
+    //_ui->PoleKnocked->setChecked(false);
+}

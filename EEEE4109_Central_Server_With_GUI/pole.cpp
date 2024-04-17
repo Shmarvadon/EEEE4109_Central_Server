@@ -7,11 +7,14 @@ Pole::Pole(PoleDataModel* model, Pole* parentItem, int port, int sessionId, uint
 	
 	// Set default values for stuffs.
 	_selected = false;
+	_polePartner = -1;
+
+	// Set connections to PoleDataModel class.
+	connect(this, &Pole::findPartnerPole, model, &PoleDataModel::findPartnerToPole);
 
 	// Configure visual information in the tree view.
 	_itemData.resize(5);
 	_itemData[0] = ("Pole " + std::to_string(sessionId)).c_str();
-
 
 	// Configure the comms thread.
 	_TCPListnerThread = new poletcpthread(this, port);
@@ -101,7 +104,6 @@ void Pole::setUISelection(bool selected) {
 	}
 
 }
-
 
 
 void poletcpthread::run() {
@@ -319,12 +321,7 @@ bool poletcpthread::SyncPoleEventsDataToServer(events* pEvents) {
 		// If the reply is a sync to server reply & it is to update events then we deserialise it into the updated events struct.
 		if (_TCPRecieveBuffer[0] == ptt::SyncToServer | ptt::Events) {
 
-			pEvents->IRBeamTriggered = _TCPRecieveBuffer[1];
-			pEvents->knocked = _TCPRecieveBuffer[2];
-			pEvents->velostatTriggered = _TCPRecieveBuffer[3];
-			pEvents->IMUTriggered = _TCPRecieveBuffer[4];
-			pEvents->IRCameraTriggered = _TCPRecieveBuffer[5];
-			pEvents->kayakerPassingDirection = _TCPRecieveBuffer[6];
+			*pEvents = (events)_TCPRecieveBuffer[1];
 
 			completedSuccessfully = true;
 		}

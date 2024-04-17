@@ -268,9 +268,10 @@ public:
         PoleKnocked->setFont(font1);
         PoleKnocked->setLayoutDirection(Qt::RightToLeft);
         PoleKnocked->setIconSize(QSize(100, 100));
-        PoleKnocked->setCheckable(false);
+        PoleKnocked->setCheckable(true);
         PoleKnocked->setChecked(false);
         PoleKnocked->setAutoRepeat(false);
+        PoleKnocked->setAutoExclusive(false);
 
         verticalLayout_4->addWidget(PoleKnocked);
 
@@ -280,10 +281,11 @@ public:
         PassageDirection->setBaseSize(QSize(50, 50));
         PassageDirection->setFont(font1);
         PassageDirection->setLayoutDirection(Qt::RightToLeft);
-        PassageDirection->setIconSize(QSize(100, 100));
-        PassageDirection->setCheckable(false);
+        PassageDirection->setIconSize(QSize(20, 20));
+        PassageDirection->setCheckable(true);
         PassageDirection->setChecked(false);
         PassageDirection->setAutoRepeat(false);
+        PassageDirection->setAutoExclusive(false);
 
         verticalLayout_4->addWidget(PassageDirection);
 
@@ -294,9 +296,10 @@ public:
         PolePowerState->setFont(font1);
         PolePowerState->setLayoutDirection(Qt::RightToLeft);
         PolePowerState->setIconSize(QSize(100, 100));
-        PolePowerState->setCheckable(false);
+        PolePowerState->setCheckable(true);
         PolePowerState->setChecked(false);
         PolePowerState->setAutoRepeat(false);
+        PolePowerState->setAutoExclusive(false);
 
         verticalLayout_4->addWidget(PolePowerState);
 
@@ -533,9 +536,10 @@ public:
         IRBeamTriggered->setFont(font1);
         IRBeamTriggered->setLayoutDirection(Qt::RightToLeft);
         IRBeamTriggered->setIconSize(QSize(100, 100));
-        IRBeamTriggered->setCheckable(false);
+        IRBeamTriggered->setCheckable(true);
         IRBeamTriggered->setChecked(false);
         IRBeamTriggered->setAutoRepeat(false);
+        IRBeamTriggered->setAutoExclusive(false);
 
         verticalLayout_3->addWidget(IRBeamTriggered);
 
@@ -546,9 +550,10 @@ public:
         IRCameraTriggered->setFont(font1);
         IRCameraTriggered->setLayoutDirection(Qt::RightToLeft);
         IRCameraTriggered->setIconSize(QSize(100, 100));
-        IRCameraTriggered->setCheckable(false);
+        IRCameraTriggered->setCheckable(true);
         IRCameraTriggered->setChecked(false);
         IRCameraTriggered->setAutoRepeat(false);
+        IRCameraTriggered->setAutoExclusive(false);
 
         verticalLayout_3->addWidget(IRCameraTriggered);
 
@@ -559,9 +564,10 @@ public:
         VelostatTriggered->setFont(font1);
         VelostatTriggered->setLayoutDirection(Qt::RightToLeft);
         VelostatTriggered->setIconSize(QSize(100, 100));
-        VelostatTriggered->setCheckable(false);
+        VelostatTriggered->setCheckable(true);
         VelostatTriggered->setChecked(false);
         VelostatTriggered->setAutoRepeat(false);
+        VelostatTriggered->setAutoExclusive(false);
 
         verticalLayout_3->addWidget(VelostatTriggered);
 

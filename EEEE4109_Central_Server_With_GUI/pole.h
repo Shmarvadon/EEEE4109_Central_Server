@@ -55,6 +55,32 @@ enum PoleType : uint8_t {
 	PhotoDiodePole		=	0b00000010
 };
 
+namespace pps{
+	enum PolePowerState : uint8_t {
+		IRBeamOn = 0b00000001,
+		IRCameraOn = 0b00000010,
+		VelostatOn = 0b00000100,
+		IMUOn = 0b00001000
+	};
+
+	inline PolePowerState operator|(PolePowerState a, PolePowerState b) {
+		return static_cast<PolePowerState>((uint8_t)a | (uint8_t)b);
+	}
+
+	inline PolePowerState operator^(PolePowerState a, PolePowerState b) {
+		return static_cast<PolePowerState>((uint8_t)a ^ (uint8_t)b);
+	}
+
+	inline PolePowerState& operator|=(PolePowerState& a, PolePowerState b) {
+		return a = a | b;
+	}
+
+	inline PolePowerState& operator^=(PolePowerState& a, PolePowerState b) {
+		return a = a ^ b;
+	}
+
+}
+
 
 struct sensors {
 	// Sensor Readings.
@@ -65,22 +91,24 @@ struct sensors {
 	float	batteryReading;		// Battery voltage reading.
 };
 
-struct events {
-	// Events.
-	bool IRBeamTriggered;
-	bool knocked;
-	bool velostatTriggered;
-	bool IMUTriggered;
-	bool IRCameraTriggered;
-	uint8_t kayakerPassingDirection;
+enum events : uint8_t {
+
+	IRBeamTriggered					=	0b00000001,
+	Knocked							=	0b00000010,
+	VelostatTriggered				=	0b00000100,
+	IMUTriggered					=	0b00001000,
+	IRCameraTriggered				=	0b00010000,
+	KayakerPassageDirectionLTR		=	0b00100000,		// Left To Right (LTR) w.r.t IR camera.
+	KayakerPassageDirectionRTL		=	0b01000000,		// Right To Left (RTL) w.r.t IR camera.
+	KayakerPassageDirectionNone		=	0b10000000,		// Unknown passage direction.
 };
 
 struct settings {
 	// Configurables.
-	uint16_t IRTransmitFreq;	// Frequency of IR LEDs.
-	float IMUSensitivity;		// IMU sensitivity.
-	float velostatSensitivity;	// Velostat sensitivity.
-	uint8_t powerState;			// Set the power state of the pole.
+	uint16_t IRTransmitFreq;			// Frequency of IR LEDs.
+	float IMUSensitivity;				// IMU sensitivity.
+	float velostatSensitivity;			// Velostat sensitivity.
+	pps::PolePowerState powerState;			// Set the power state of the pole.
 };
 
 struct polestate {
@@ -106,7 +134,6 @@ public slots:
 	bool SyncPoleEventsDataToServer(events* newData);		// Needs to be blocking call.
 	bool SyncPoleSettingsDataToServer(settings* newData);	// Needs to be blocking call.
 
-	// From Pole class.
 	bool SyncPoleSettingsDataToPole(settings* newData);	// Needs to be blocking call.
 
 signals:
@@ -153,10 +180,11 @@ public:
 
 	uint8_t getPoleType() { return _poleType; }
 	int		getPoleSessionID() { return _sessionId; }
+	int		getPolePartnerID() { return _polePartner; }
 
-	//void setIRLEDFrequency(uint16_t freq);
-	//void setIMUSensitivity(float sensitivity);
-	//void setVelostatSensitivity(float sensitivity);
+	void	setPolePartnerID(int partnerId) { _polePartner = partnerId; }
+
+	polestate* getPoleState() { return &_poleState; }
 
 public slots:
 
@@ -167,9 +195,6 @@ public slots:
 
 	// From tcpthread.
 	void UpdatePoleConnectionStatus(pcs::PoleConnectionStatus connectionStatus);
-	void UpdateLocalPoleSensorData(sensors		newData) { _poleState.Sensors = newData;  }
-	void UpdateLocalPoleEventdData(events		newData) { _poleState.Events = newData;   }
-	void UpdateLocalPoleSettingsData(settings	newData) { _poleState.Settings = newData; }
 
 
 
@@ -188,6 +213,8 @@ signals:
 	// To PoleTreeView Data Model class.
 	void updateVisual();
 
+	bool findPartnerPole(Pole* pPole);
+
 	//ToUpdate UI Elements.
 	void VisualisePoleType(QString text);
 	void VisualisePoleHWID(QString text);
@@ -200,6 +227,7 @@ signals:
 	
 	void VisualiseTouchSensitivity(QString text);
 	void VisualiseIMUSensitivity(QString text);
+
 
 protected:
 

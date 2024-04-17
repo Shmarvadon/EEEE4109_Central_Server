@@ -3,4 +3,7 @@
         <file>EEEE4109_Master_Pole_UI_Drawing.png</file>
         <file>EEEE4109_Slave_Pole_UI_Drawing.png</file>
     </qresource>
+    <qresource prefix="/EventsIndicatorIcons">
+        <file>App_Events_Icons.png</file>
+    </qresource>
 </RCC>

@@ -89,7 +89,53 @@ void PoleDataModel::appendNewPole(int port, int sessionId, uint64_t HWID, uint8_
 	//emit dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole });
 }
 
+bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 
+	// If LED pole.
+	if (pPole->getPoleType() == LEDPole) {
+
+	}
+	// If Photodiode pole.
+	if (pPole->getPoleType() == PhotoDiodePole) {
+
+		//Configure the pole to be ready to read its IR photodiode sensor.
+		pPole->getPoleState()->Settings.powerState |= pps::IRBeamOn;
+		pPole->SyncPoleSettingsDataToPole(&pPole->getPoleState()->Settings);
+
+		// Iterate over all poles that are of LED type and do not have a partner pole assigned to them yet.
+		for (auto& pole : _poles) {
+			if (pole->getPoleType() == LEDPole && pole->getPolePartnerID() == -1) {
+				polestate* pPoleState = pole->getPoleState();
+
+				pPoleState->Settings.IRTransmitFreq = 15000;	// Set frequency to 15khz.
+				pPoleState->Settings.powerState |= pps::IRBeamOn;	// Turn the IR beam on.
+
+				// This makes the pole broadcast at this freq.
+				pole->SyncPoleSettingsDataToPole(&pPoleState->Settings);
+
+				// Retrieve the pole thats searching for a partners updated sensor values.
+				pPole->SyncPoleSensorsDataToServer(&pPole->getPoleState()->Sensors);
+
+				// If it detects the freq then we have found a match.
+				if (pPole->getPoleState()->Sensors.IRGateReading == 15000) {
+					pPole->setPolePartnerID(pole->getPoleSessionID());
+					break;
+				}
+
+				// If we do not find the poles signal (I.E. It is probably not the partner pole) we turn off the IR beam on the other pole.
+
+				// Turn off the IR beam.
+				pPoleState->Settings.powerState ^= pps::IRBeamOn;
+				pole->SyncPoleSettingsDataToPole(&pPoleState->Settings);
+			}
+		}
+	}
+
+
+
+
+	return true;
+}
 
 void udplistnerthread::run() {
 	/*   Setup the UDP port to listen for connections.   */

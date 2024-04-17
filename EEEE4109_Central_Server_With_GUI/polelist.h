@@ -61,6 +61,8 @@ public slots:
     // From Pole class.
     void updateVisual(){ dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole }); }
 
+    bool findPartnerToPole(Pole* pPole);
+
 signals:
 
 private:

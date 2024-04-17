@@ -350,7 +350,7 @@
           <rect>
            <x>460</x>
            <y>710</y>
-           <width>169</width>
+           <width>209</width>
            <height>201</height>
           </rect>
          </property>
@@ -393,6 +393,9 @@
              <bool>false</bool>
             </property>
             <property name="autoRepeat">
+             <bool>false</bool>
+            </property>
+            <property name="autoExclusive">
              <bool>false</bool>
             </property>
            </widget>
