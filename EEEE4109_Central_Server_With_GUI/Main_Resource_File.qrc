@@ -4,6 +4,15 @@
         <file>EEEE4109_Slave_Pole_UI_Drawing.png</file>
     </qresource>
     <qresource prefix="/EventsIndicatorIcons">
-        <file>App_Events_Icons.png</file>
+        <file>Green_Circle.png</file>
+        <file>Green_Down_Arrow.png</file>
+        <file>Green_Up_Arrrow.png</file>
+        <file>Orange_Circle.png</file>
+        <file>Red_Circle.png</file>
+        <file>Grey_Circle.png</file>
+        <file>High_Icon.png</file>
+        <file>Low_Icon.png</file>
+        <file>Medium_Icon.png</file>
+        <file>Sleep_Icon.png</file>
     </qresource>
 </RCC>

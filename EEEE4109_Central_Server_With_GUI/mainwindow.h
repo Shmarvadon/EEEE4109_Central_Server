@@ -31,6 +31,15 @@ public slots:
     void handleTouchSensitivityInput() {};
     void handleIMUSensitivityInput() {};
 
+    void handleFindPolePartnerButtonClicked(bool checked) { if (_currentlySelectedPole != nullptr) _poleList->findPartnerToPole(_currentlySelectedPole); };
+
+    // From Pole class 
+
+
+    void updatePoleEventsVisualIndicators(events eventsdata);
+    void setPowerStateIndicator(pps::PolePowerState powerState);
+
+
 private:
     Ui::MainWindow *_ui;
     PoleDataModel* _poleList;

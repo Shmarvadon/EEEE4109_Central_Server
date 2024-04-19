@@ -1,9 +1,9 @@
 #include "polelist.h"
 
-PoleDataModel::PoleDataModel(int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : _rootItem(new Pole(this, QVariantList{ tr("Pole Name"), tr("Battery"), tr("Status"), tr("Partner"), tr("Gate Number") })) {
+PoleDataModel::PoleDataModel(int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : _rootItem(new TreeViewHeader(this, QVariantList{ tr("Pole Name"), tr("Battery"), tr("Status"), tr("Partner"), tr("Gate Number") })) {
 	
 	// Setup the UDP listner thread.
-	_UDPListnerThread = new udplistnerthread(this, this, _rootItem, UDPListnerPort, TCPPortRange);
+	_UDPListnerThread = new udplistnerthread(this, this, UDPListnerPort, TCPPortRange);
 	connect(_UDPListnerThread, &udplistnerthread::appendNewPole, this, &PoleDataModel::appendNewPole);
 	_UDPListnerThread->start();
 }
@@ -17,7 +17,7 @@ PoleDataModel::~PoleDataModel() {
 QModelIndex PoleDataModel::index(int row, int column, const QModelIndex& parent) const {
 	if (!hasIndex(row, column, parent)) return {};
 
-	Pole* parentItem = parent.isValid() ? static_cast<Pole*>(parent.internalPointer()) : _rootItem;
+	TreeViewHeader* parentItem = parent.isValid() ? static_cast<TreeViewHeader*>(parent.internalPointer()) : _rootItem;
 
 	if (auto* childItem = parentItem->child(row)) return createIndex(row, column, childItem);
 	return {};
@@ -25,24 +25,18 @@ QModelIndex PoleDataModel::index(int row, int column, const QModelIndex& parent)
 
 QModelIndex PoleDataModel::parent(const QModelIndex& index) const {
 	if (!index.isValid()) return {};
-
-	auto* ChildItem = static_cast<Pole*>(index.internalPointer());
-	Pole* parentItem = ChildItem->parentItem();
-
-	return parentItem != _rootItem ? createIndex(parentItem->row(), 0, parentItem) : QModelIndex{};
+	return createIndex(0, 0, _rootItem);
 }
 
 int PoleDataModel::rowCount(const QModelIndex& parent) const {
 	if (parent.column() > 0) return 0;
 
-	const Pole* parentItem = parent.isValid() ? static_cast<const Pole*>(parent.internalPointer()) : _rootItem;
+	const TreeViewHeader* parentItem = parent.isValid() ? static_cast<const TreeViewHeader*>(parent.internalPointer()) : _rootItem;
 
 	return parentItem->childCount();
 }
 
 int PoleDataModel::columnCount(const QModelIndex& parent) const {
-	if (parent.isValid()) return static_cast<Pole*>(parent.internalPointer())->columnCount();
-
 	return _rootItem->columnCount();
 }
 
@@ -50,12 +44,16 @@ QVariant PoleDataModel::data(const QModelIndex& index, int role) const {
 	
 	if (role == Qt::TextAlignmentRole) return Qt::AlignHCenter;
 
-	if (role == Qt::DisplayRole) return static_cast<Pole*>(index.internalPointer())->data(index.column());
+	if (role == Qt::DisplayRole) {
+		return static_cast<Pole*>(index.internalPointer())->data(index.column());
+	}
 
 
 	if (!index.isValid() || role != Qt::DisplayRole) return {};
 
-	return static_cast<Pole*>(index.internalPointer())->data(index.column());
+	
+
+	//return static_cast<TreeViewHeader*>(index.internalPointer())->data(index.column());
 }
 
 Qt::ItemFlags PoleDataModel::flags(const QModelIndex& index) const {
@@ -68,14 +66,14 @@ QVariant PoleDataModel::headerData(int section, Qt::Orientation orientation, int
 	return orientation == Qt::Horizontal && role == Qt::DisplayRole ? _rootItem->data(section) : QVariant{};
 }
 
-Pole* PoleDataModel::getRootItem() {
+TreeViewHeader* PoleDataModel::getRootItem() {
 	return _rootItem;
 }
 
-void PoleDataModel::appendNewPole(int port, int sessionId, uint64_t HWID, uint8_t type){
+void PoleDataModel::appendNewPole(int port, uint64_t HWID, uint8_t type){
 
 	// Create the new pole.
-	Pole* pole = new Pole(this, _rootItem, port, sessionId, HWID, type);
+	Pole* pole = new Pole(this, _rootItem, port, _poles.size(), HWID, type);
 
 	// Update the model.
 	beginInsertRows(QModelIndex(), _rootItem->childCount(), _rootItem->childCount());
@@ -94,13 +92,53 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 	// If LED pole.
 	if (pPole->getPoleType() == LEDPole) {
 
+		// Configure the LED pole to broadcast @15khz.
+		pPole->getPoleState()->Settings.powerState |= pps::IRBeamOn;
+		pPole->getPoleState()->Settings.IRTransmitFreq = 15000;
+
+		// Sync the configuration to the pole.
+		pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
+
+		// Iterate over all Photodiode poles that do not have a partner yet.
+		for (auto& pole : _poles) {
+			if (pole->getPoleType() == PhotoDiodePole && pole->getPolePartnerID() == -1) {
+				polestate* pPoleState = pole->getPoleState();
+
+				// Setup this pole to recieve the transmission.
+				pPoleState->Settings.powerState |= pps::IRBeamOn;	// Turn the IR beam on.
+
+				// Sync the new configuration to the pole.
+				pole->syncSettingsToPole(pPoleState->Settings);
+
+				// Retrieve the IR beam freq that the pole is seeing now.
+				pPoleState->Sensors = pole->syncSensorReadingsToServer();
+
+				// If the pole detects the IR beam from the LED pole.
+				if (pPoleState->Sensors.IRGateReading >= 14500 && pPoleState->Sensors.IRGateReading <= 15500) {
+
+					// Assign the poles as eachothers partner.
+					pPole->setPolePartnerID(pole->getPoleSessionID());
+					pole->setPolePartnerID(pPole->getPoleSessionID());
+
+					// Turn off the IR LEDs on the LED pole.
+					pPole->getPoleState()->Settings.powerState ^= pps::IRBeamOn;
+					pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
+
+					// Update the visual in the treeview.
+					updateVisual();
+
+					return true;
+				}
+			}
+		}
+
 	}
 	// If Photodiode pole.
 	if (pPole->getPoleType() == PhotoDiodePole) {
 
 		//Configure the pole to be ready to read its IR photodiode sensor.
 		pPole->getPoleState()->Settings.powerState |= pps::IRBeamOn;
-		pPole->SyncPoleSettingsDataToPole(&pPole->getPoleState()->Settings);
+		pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
 
 		// Iterate over all poles that are of LED type and do not have a partner pole assigned to them yet.
 		for (auto& pole : _poles) {
@@ -111,22 +149,29 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				pPoleState->Settings.powerState |= pps::IRBeamOn;	// Turn the IR beam on.
 
 				// This makes the pole broadcast at this freq.
-				pole->SyncPoleSettingsDataToPole(&pPoleState->Settings);
+				pole->syncSettingsToPole(pPoleState->Settings);
 
 				// Retrieve the pole thats searching for a partners updated sensor values.
-				pPole->SyncPoleSensorsDataToServer(&pPole->getPoleState()->Sensors);
+				pPole->getPoleState()->Sensors = pPole->syncSensorReadingsToServer();
+
+				// Turn off the IR beam on the LED pole now that we are done measuring the burst.
+				pPoleState->Settings.powerState ^= pps::IRBeamOn;
+				pole->syncSettingsToPole(pPoleState->Settings);
 
 				// If it detects the freq then we have found a match.
-				if (pPole->getPoleState()->Sensors.IRGateReading == 15000) {
+				if (pPole->getPoleState()->Sensors.IRGateReading >= 14500 && pPole->getPoleState()->Sensors.IRGateReading <= 15500) {
+
+					// Assign the poles as eachothers partner.
 					pPole->setPolePartnerID(pole->getPoleSessionID());
-					break;
+					pole->setPolePartnerID(pPole->getPoleSessionID());
+
+					// Update the visual in the treeview.
+					updateVisual();
+
+					return true;
 				}
 
-				// If we do not find the poles signal (I.E. It is probably not the partner pole) we turn off the IR beam on the other pole.
-
-				// Turn off the IR beam.
-				pPoleState->Settings.powerState ^= pps::IRBeamOn;
-				pole->SyncPoleSettingsDataToPole(&pPoleState->Settings);
+				// If we do not find the poles signal (I.E. It is probably not the partner pole) we move on to the next pole.
 			}
 		}
 	}
@@ -134,7 +179,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 
 
 
-	return true;
+	return false;
 }
 
 void udplistnerthread::run() {
@@ -210,7 +255,6 @@ void udplistnerthread::run() {
 	DWORD senderBytesSent = 0;
 	DWORD senderFlags = 0;
 
-
 	/*   Listen for UDP broadcasts   */
 
 	while (true) {
@@ -231,9 +275,6 @@ void udplistnerthread::run() {
 
 		uint32_t polePort = (_TCPPortsRange.first + _NumberOfPolesConncted < _TCPPortsRange.second) ? _TCPPortsRange.first + _NumberOfPolesConncted : throw std::runtime_error("Ran out of valid TCP ports to use.");
 
-		// Obtain a session ID for the pole.
-		uint32_t poleSessionId = _NumberOfPolesConncted;
-
 		// Obtain the poles HWID.
 		uint64_t poleHWID;
 		memcpy(&poleHWID, &listnerBuff[0], sizeof(uint64_t));
@@ -243,10 +284,9 @@ void udplistnerthread::run() {
 
 		// Pack reply data into buffer.
 		memcpy(senderBuff, &polePort, sizeof(uint32_t));
-		memcpy(&senderBuff[4], &poleSessionId, sizeof(uint32_t));
 
 		// Emit a signal to queue up the operation of appending the new pole to the _poles vector in the data model.
-		emit appendNewPole(polePort, poleSessionId, poleHWID, poleType);
+		emit appendNewPole(polePort, poleHWID, poleType);
 
 		// Send the reply.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;

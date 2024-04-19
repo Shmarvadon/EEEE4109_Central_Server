@@ -5,16 +5,17 @@
 #define UDP_BUFF_SIZE 512
 
 class PoleDataModel;
+class Pole;
 
 class udplistnerthread : public QThread {
     Q_OBJECT
 public:
 
-        explicit udplistnerthread(PoleDataModel* model, QObject* parent, Pole* rootItem, int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : QThread(parent), _RootItem(rootItem), _UDPListnerPort(UDPListnerPort), _TCPPortsRange(TCPPortRange), _NumberOfPolesConncted(0), _Model(model) {};
+        explicit udplistnerthread(PoleDataModel* model, QObject* parent, int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : QThread(parent), _UDPListnerPort(UDPListnerPort), _TCPPortsRange(TCPPortRange), _NumberOfPolesConncted(0), _Model(model) {};
         void run() override;
 
 signals:
-    void appendNewPole(int port, int sessionId, uint64_t HWID, uint8_t type);
+    void appendNewPole(int port, uint64_t HWID, uint8_t type);
 
 private:
     std::pair<uint32_t, uint32_t> _TCPPortsRange;
@@ -22,11 +23,8 @@ private:
     SOCKET UDPSender;
     int _UDPListnerPort;
     int _NumberOfPolesConncted;
-    Pole* _RootItem;
     PoleDataModel* _Model;
 };
-
-
 
 class PoleDataModel : public QAbstractItemModel {
 
@@ -50,13 +48,13 @@ public:
     int rowCount(const QModelIndex& parent = {}) const override;
     int columnCount(const QModelIndex& parent = {}) const override;
 
-    Pole* getRootItem();
+    TreeViewHeader* getRootItem();
 
     /*			My Methods :)			*/
 public slots:
 
     // From UDP listner thread.
-    void appendNewPole(int port, int sessionId, uint64_t HWID, uint8_t type);
+    void appendNewPole(int port, uint64_t HWID, uint8_t type);
 
     // From Pole class.
     void updateVisual(){ dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole }); }
@@ -69,10 +67,45 @@ private:
 
 
     /*			Stuff for QT UI			*/
-    Pole* _rootItem = nullptr;
+    TreeViewHeader* _rootItem = nullptr;
 
     /*			My Stuff :)			*/
 
     std::vector<Pole*> _poles;
     udplistnerthread* _UDPListnerThread;
+};
+
+class TreeViewHeader : public QObject {
+	Q_OBJECT
+
+public:
+	Q_DISABLE_COPY_MOVE(TreeViewHeader)
+
+	/*			Constructors			*/
+	explicit TreeViewHeader(PoleDataModel* model, QVariantList data, Pole* parentItem = nullptr);	// I do need this for the header.
+
+    ~TreeViewHeader() {};
+
+	/*			QT methods			*/
+	void appendChild(Pole* child);
+
+	Pole* child(int row);
+	int childCount() const;
+	int columnCount() const;
+	QVariant data(int column) const;
+	int row() const;
+	TreeViewHeader* parentItem();
+
+    // My stuff.
+    std::vector<Pole*>& getChildItems() { return _childItems; }
+
+private:
+
+	/*			Stuff for QT UI			*/
+	std::vector<Pole*> _childItems;
+	QVariantList _itemData;
+	Pole* _parentItem;
+
+    // My stuff.
+    PoleDataModel* _Model;
 };

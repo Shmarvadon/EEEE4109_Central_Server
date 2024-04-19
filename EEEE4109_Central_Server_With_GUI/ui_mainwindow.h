@@ -22,7 +22,6 @@
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QPushButton>
-#include <QtWidgets/QRadioButton>
 #include <QtWidgets/QSpacerItem>
 #include <QtWidgets/QStackedWidget>
 #include <QtWidgets/QStatusBar>
@@ -63,9 +62,15 @@ public:
     QLabel *label_13;
     QWidget *layoutWidget_11;
     QVBoxLayout *verticalLayout_4;
-    QRadioButton *PoleKnocked;
-    QRadioButton *PassageDirection;
-    QRadioButton *PolePowerState;
+    QHBoxLayout *horizontalLayout_14;
+    QLabel *label_20;
+    QLabel *PoleKnockedIndicator;
+    QHBoxLayout *horizontalLayout_13;
+    QLabel *label_18;
+    QLabel *PassageDirectionIndicator;
+    QHBoxLayout *horizontalLayout_12;
+    QLabel *label_16;
+    QLabel *PowerStateIndicator;
     QPushButton *FindGateButton;
     QPushButton *PoleStatusCheckButton;
     QPushButton *ReCalibratePoleButton;
@@ -107,9 +112,15 @@ public:
     QLineEdit *IMUSensitivityInputBox;
     QWidget *layoutWidget3;
     QVBoxLayout *verticalLayout_3;
-    QRadioButton *IRBeamTriggered;
-    QRadioButton *IRCameraTriggered;
-    QRadioButton *VelostatTriggered;
+    QHBoxLayout *horizontalLayout_16;
+    QLabel *label_24;
+    QLabel *IRBeamTriggeredIndicator;
+    QHBoxLayout *horizontalLayout_15;
+    QLabel *label_22;
+    QLabel *IRCameraTriggeredIndicator;
+    QHBoxLayout *horizontalLayout_17;
+    QLabel *label_26;
+    QLabel *VelostatTriggeredIndicator;
     QStatusBar *statusbar;
     QMenuBar *menubar;
     QMenu *menuFile;
@@ -129,6 +140,9 @@ public:
         MainWindow->setSizePolicy(sizePolicy);
         MainWindow->setMinimumSize(QSize(1200, 1000));
         MainWindow->setMaximumSize(QSize(1200, 1000));
+        QFont font;
+        font.setPointSize(15);
+        MainWindow->setFont(font);
         centralwidget = new QWidget(MainWindow);
         centralwidget->setObjectName("centralwidget");
         layoutWidget = new QWidget(centralwidget);
@@ -140,6 +154,9 @@ public:
         treeView = new QTreeView(layoutWidget);
         treeView->setObjectName("treeView");
         treeView->setMaximumSize(QSize(510, 16777215));
+        QFont font1;
+        font1.setPointSize(12);
+        treeView->setFont(font1);
         treeView->setLayoutDirection(Qt::LeftToRight);
         treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         treeView->setAlternatingRowColors(true);
@@ -162,9 +179,9 @@ public:
         label = new QLabel(nopoleselectedview);
         label->setObjectName("label");
         label->setGeometry(QRect(0, 90, 591, 751));
-        QFont font;
-        font.setPointSize(20);
-        label->setFont(font);
+        QFont font2;
+        font2.setPointSize(20);
+        label->setFont(font2);
         label->setTextFormat(Qt::AutoText);
         label->setWordWrap(true);
         PoleStatusViewSection->addWidget(nopoleselectedview);
@@ -191,7 +208,7 @@ public:
         label_4 = new QLabel(poleselectedview);
         label_4->setObjectName("label_4");
         label_4->setGeometry(QRect(-10, 0, 671, 71));
-        label_4->setFont(font);
+        label_4->setFont(font2);
         label_4->setAlignment(Qt::AlignCenter);
         frame = new QFrame(poleselectedview);
         frame->setObjectName("frame");
@@ -206,8 +223,6 @@ public:
         horizontalLayout_10->setContentsMargins(0, 0, 0, 0);
         label_14 = new QLabel(layoutWidget_9);
         label_14->setObjectName("label_14");
-        QFont font1;
-        font1.setPointSize(12);
         label_14->setFont(font1);
 
         horizontalLayout_10->addWidget(label_14);
@@ -250,71 +265,90 @@ public:
         label_13 = new QLabel(poleselectedview);
         label_13->setObjectName("label_13");
         label_13->setGeometry(QRect(210, 460, 421, 31));
-        QFont font2;
-        font2.setPointSize(15);
-        label_13->setFont(font2);
+        label_13->setFont(font);
         label_13->setLayoutDirection(Qt::LeftToRight);
         label_13->setAlignment(Qt::AlignCenter);
         layoutWidget_11 = new QWidget(poleselectedview);
         layoutWidget_11->setObjectName("layoutWidget_11");
-        layoutWidget_11->setGeometry(QRect(460, 710, 169, 201));
+        layoutWidget_11->setGeometry(QRect(460, 710, 210, 201));
         verticalLayout_4 = new QVBoxLayout(layoutWidget_11);
         verticalLayout_4->setObjectName("verticalLayout_4");
         verticalLayout_4->setContentsMargins(0, 0, 0, 0);
-        PoleKnocked = new QRadioButton(layoutWidget_11);
-        PoleKnocked->setObjectName("PoleKnocked");
-        PoleKnocked->setMinimumSize(QSize(0, 0));
-        PoleKnocked->setBaseSize(QSize(50, 50));
-        PoleKnocked->setFont(font1);
-        PoleKnocked->setLayoutDirection(Qt::RightToLeft);
-        PoleKnocked->setIconSize(QSize(100, 100));
-        PoleKnocked->setCheckable(true);
-        PoleKnocked->setChecked(false);
-        PoleKnocked->setAutoRepeat(false);
-        PoleKnocked->setAutoExclusive(false);
+        horizontalLayout_14 = new QHBoxLayout();
+        horizontalLayout_14->setObjectName("horizontalLayout_14");
+        label_20 = new QLabel(layoutWidget_11);
+        label_20->setObjectName("label_20");
+        label_20->setFont(font1);
 
-        verticalLayout_4->addWidget(PoleKnocked);
+        horizontalLayout_14->addWidget(label_20);
 
-        PassageDirection = new QRadioButton(layoutWidget_11);
-        PassageDirection->setObjectName("PassageDirection");
-        PassageDirection->setMinimumSize(QSize(0, 0));
-        PassageDirection->setBaseSize(QSize(50, 50));
-        PassageDirection->setFont(font1);
-        PassageDirection->setLayoutDirection(Qt::RightToLeft);
-        PassageDirection->setIconSize(QSize(20, 20));
-        PassageDirection->setCheckable(true);
-        PassageDirection->setChecked(false);
-        PassageDirection->setAutoRepeat(false);
-        PassageDirection->setAutoExclusive(false);
+        PoleKnockedIndicator = new QLabel(layoutWidget_11);
+        PoleKnockedIndicator->setObjectName("PoleKnockedIndicator");
+        PoleKnockedIndicator->setMaximumSize(QSize(50, 50));
+        PoleKnockedIndicator->setFont(font1);
+        PoleKnockedIndicator->setScaledContents(true);
+        PoleKnockedIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        PoleKnockedIndicator->setMargin(10);
 
-        verticalLayout_4->addWidget(PassageDirection);
+        horizontalLayout_14->addWidget(PoleKnockedIndicator);
 
-        PolePowerState = new QRadioButton(layoutWidget_11);
-        PolePowerState->setObjectName("PolePowerState");
-        PolePowerState->setMinimumSize(QSize(0, 0));
-        PolePowerState->setBaseSize(QSize(50, 50));
-        PolePowerState->setFont(font1);
-        PolePowerState->setLayoutDirection(Qt::RightToLeft);
-        PolePowerState->setIconSize(QSize(100, 100));
-        PolePowerState->setCheckable(true);
-        PolePowerState->setChecked(false);
-        PolePowerState->setAutoRepeat(false);
-        PolePowerState->setAutoExclusive(false);
 
-        verticalLayout_4->addWidget(PolePowerState);
+        verticalLayout_4->addLayout(horizontalLayout_14);
+
+        horizontalLayout_13 = new QHBoxLayout();
+        horizontalLayout_13->setObjectName("horizontalLayout_13");
+        label_18 = new QLabel(layoutWidget_11);
+        label_18->setObjectName("label_18");
+        label_18->setFont(font1);
+
+        horizontalLayout_13->addWidget(label_18);
+
+        PassageDirectionIndicator = new QLabel(layoutWidget_11);
+        PassageDirectionIndicator->setObjectName("PassageDirectionIndicator");
+        PassageDirectionIndicator->setMaximumSize(QSize(50, 50));
+        PassageDirectionIndicator->setFont(font1);
+        PassageDirectionIndicator->setScaledContents(true);
+        PassageDirectionIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        PassageDirectionIndicator->setMargin(10);
+
+        horizontalLayout_13->addWidget(PassageDirectionIndicator);
+
+
+        verticalLayout_4->addLayout(horizontalLayout_13);
+
+        horizontalLayout_12 = new QHBoxLayout();
+        horizontalLayout_12->setObjectName("horizontalLayout_12");
+        label_16 = new QLabel(layoutWidget_11);
+        label_16->setObjectName("label_16");
+        label_16->setFont(font1);
+
+        horizontalLayout_12->addWidget(label_16);
+
+        PowerStateIndicator = new QLabel(layoutWidget_11);
+        PowerStateIndicator->setObjectName("PowerStateIndicator");
+        PowerStateIndicator->setMaximumSize(QSize(50, 50));
+        PowerStateIndicator->setFont(font1);
+        PowerStateIndicator->setScaledContents(true);
+        PowerStateIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        PowerStateIndicator->setMargin(10);
+
+        horizontalLayout_12->addWidget(PowerStateIndicator);
+
+
+        verticalLayout_4->addLayout(horizontalLayout_12);
 
         FindGateButton = new QPushButton(poleselectedview);
         FindGateButton->setObjectName("FindGateButton");
         FindGateButton->setGeometry(QRect(210, 390, 101, 31));
-        FindGateButton->setFont(font2);
+        FindGateButton->setFont(font);
         PoleStatusCheckButton = new QPushButton(poleselectedview);
         PoleStatusCheckButton->setObjectName("PoleStatusCheckButton");
         PoleStatusCheckButton->setGeometry(QRect(350, 390, 121, 31));
-        PoleStatusCheckButton->setFont(font2);
+        PoleStatusCheckButton->setFont(font);
         ReCalibratePoleButton = new QPushButton(poleselectedview);
         ReCalibratePoleButton->setObjectName("ReCalibratePoleButton");
         ReCalibratePoleButton->setGeometry(QRect(510, 390, 121, 31));
-        ReCalibratePoleButton->setFont(font2);
+        ReCalibratePoleButton->setFont(font);
         layoutWidget1 = new QWidget(poleselectedview);
         layoutWidget1->setObjectName("layoutWidget1");
         layoutWidget1->setGeometry(QRect(210, 100, 202, 241));
@@ -525,51 +559,72 @@ public:
 
         layoutWidget3 = new QWidget(poleselectedview);
         layoutWidget3->setObjectName("layoutWidget3");
-        layoutWidget3->setGeometry(QRect(210, 710, 169, 201));
+        layoutWidget3->setGeometry(QRect(210, 710, 225, 201));
         verticalLayout_3 = new QVBoxLayout(layoutWidget3);
         verticalLayout_3->setObjectName("verticalLayout_3");
         verticalLayout_3->setContentsMargins(0, 0, 0, 0);
-        IRBeamTriggered = new QRadioButton(layoutWidget3);
-        IRBeamTriggered->setObjectName("IRBeamTriggered");
-        IRBeamTriggered->setMinimumSize(QSize(0, 0));
-        IRBeamTriggered->setBaseSize(QSize(50, 50));
-        IRBeamTriggered->setFont(font1);
-        IRBeamTriggered->setLayoutDirection(Qt::RightToLeft);
-        IRBeamTriggered->setIconSize(QSize(100, 100));
-        IRBeamTriggered->setCheckable(true);
-        IRBeamTriggered->setChecked(false);
-        IRBeamTriggered->setAutoRepeat(false);
-        IRBeamTriggered->setAutoExclusive(false);
+        horizontalLayout_16 = new QHBoxLayout();
+        horizontalLayout_16->setObjectName("horizontalLayout_16");
+        label_24 = new QLabel(layoutWidget3);
+        label_24->setObjectName("label_24");
+        label_24->setFont(font1);
 
-        verticalLayout_3->addWidget(IRBeamTriggered);
+        horizontalLayout_16->addWidget(label_24);
 
-        IRCameraTriggered = new QRadioButton(layoutWidget3);
-        IRCameraTriggered->setObjectName("IRCameraTriggered");
-        IRCameraTriggered->setMinimumSize(QSize(0, 0));
-        IRCameraTriggered->setBaseSize(QSize(50, 50));
-        IRCameraTriggered->setFont(font1);
-        IRCameraTriggered->setLayoutDirection(Qt::RightToLeft);
-        IRCameraTriggered->setIconSize(QSize(100, 100));
-        IRCameraTriggered->setCheckable(true);
-        IRCameraTriggered->setChecked(false);
-        IRCameraTriggered->setAutoRepeat(false);
-        IRCameraTriggered->setAutoExclusive(false);
+        IRBeamTriggeredIndicator = new QLabel(layoutWidget3);
+        IRBeamTriggeredIndicator->setObjectName("IRBeamTriggeredIndicator");
+        IRBeamTriggeredIndicator->setMaximumSize(QSize(50, 50));
+        IRBeamTriggeredIndicator->setFont(font1);
+        IRBeamTriggeredIndicator->setScaledContents(true);
+        IRBeamTriggeredIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        IRBeamTriggeredIndicator->setMargin(10);
 
-        verticalLayout_3->addWidget(IRCameraTriggered);
+        horizontalLayout_16->addWidget(IRBeamTriggeredIndicator);
 
-        VelostatTriggered = new QRadioButton(layoutWidget3);
-        VelostatTriggered->setObjectName("VelostatTriggered");
-        VelostatTriggered->setMinimumSize(QSize(0, 0));
-        VelostatTriggered->setBaseSize(QSize(50, 50));
-        VelostatTriggered->setFont(font1);
-        VelostatTriggered->setLayoutDirection(Qt::RightToLeft);
-        VelostatTriggered->setIconSize(QSize(100, 100));
-        VelostatTriggered->setCheckable(true);
-        VelostatTriggered->setChecked(false);
-        VelostatTriggered->setAutoRepeat(false);
-        VelostatTriggered->setAutoExclusive(false);
 
-        verticalLayout_3->addWidget(VelostatTriggered);
+        verticalLayout_3->addLayout(horizontalLayout_16);
+
+        horizontalLayout_15 = new QHBoxLayout();
+        horizontalLayout_15->setObjectName("horizontalLayout_15");
+        label_22 = new QLabel(layoutWidget3);
+        label_22->setObjectName("label_22");
+        label_22->setFont(font1);
+
+        horizontalLayout_15->addWidget(label_22);
+
+        IRCameraTriggeredIndicator = new QLabel(layoutWidget3);
+        IRCameraTriggeredIndicator->setObjectName("IRCameraTriggeredIndicator");
+        IRCameraTriggeredIndicator->setMaximumSize(QSize(50, 50));
+        IRCameraTriggeredIndicator->setFont(font1);
+        IRCameraTriggeredIndicator->setScaledContents(true);
+        IRCameraTriggeredIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        IRCameraTriggeredIndicator->setMargin(10);
+
+        horizontalLayout_15->addWidget(IRCameraTriggeredIndicator);
+
+
+        verticalLayout_3->addLayout(horizontalLayout_15);
+
+        horizontalLayout_17 = new QHBoxLayout();
+        horizontalLayout_17->setObjectName("horizontalLayout_17");
+        label_26 = new QLabel(layoutWidget3);
+        label_26->setObjectName("label_26");
+        label_26->setFont(font1);
+
+        horizontalLayout_17->addWidget(label_26);
+
+        VelostatTriggeredIndicator = new QLabel(layoutWidget3);
+        VelostatTriggeredIndicator->setObjectName("VelostatTriggeredIndicator");
+        VelostatTriggeredIndicator->setMaximumSize(QSize(50, 50));
+        VelostatTriggeredIndicator->setFont(font1);
+        VelostatTriggeredIndicator->setScaledContents(true);
+        VelostatTriggeredIndicator->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+        VelostatTriggeredIndicator->setMargin(10);
+
+        horizontalLayout_17->addWidget(VelostatTriggeredIndicator);
+
+
+        verticalLayout_3->addLayout(horizontalLayout_17);
 
         PoleStatusViewSection->addWidget(poleselectedview);
 
@@ -581,7 +636,8 @@ public:
         MainWindow->setStatusBar(statusbar);
         menubar = new QMenuBar(MainWindow);
         menubar->setObjectName("menubar");
-        menubar->setGeometry(QRect(0, 0, 1200, 21));
+        menubar->setGeometry(QRect(0, 0, 1200, 26));
+        menubar->setFont(font1);
         menuFile = new QMenu(menubar);
         menuFile->setObjectName("menuFile");
         menuHelp = new QMenu(menubar);
@@ -613,9 +669,12 @@ public:
         label_14->setText(QCoreApplication::translate("MainWindow", "Gate Number", nullptr));
         label_15->setText(QCoreApplication::translate("MainWindow", "Passage Direction", nullptr));
         label_13->setText(QCoreApplication::translate("MainWindow", "Gate Configuration", nullptr));
-        PoleKnocked->setText(QCoreApplication::translate("MainWindow", "Pole Knocked:", nullptr));
-        PassageDirection->setText(QCoreApplication::translate("MainWindow", "Passage Direction:", nullptr));
-        PolePowerState->setText(QCoreApplication::translate("MainWindow", "Pole Power State:", nullptr));
+        label_20->setText(QCoreApplication::translate("MainWindow", "Pole Knocked:", nullptr));
+        PoleKnockedIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
+        label_18->setText(QCoreApplication::translate("MainWindow", "PassageDirection:", nullptr));
+        PassageDirectionIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
+        label_16->setText(QCoreApplication::translate("MainWindow", "Power State:", nullptr));
+        PowerStateIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
         FindGateButton->setText(QCoreApplication::translate("MainWindow", "Find Gate", nullptr));
         PoleStatusCheckButton->setText(QCoreApplication::translate("MainWindow", "Status check", nullptr));
         ReCalibratePoleButton->setText(QCoreApplication::translate("MainWindow", "Re-Calibrate", nullptr));
@@ -627,9 +686,12 @@ public:
         label_11->setText(QCoreApplication::translate("MainWindow", "Pole Battery:", nullptr));
         label_10->setText(QCoreApplication::translate("MainWindow", "IR Frequency::", nullptr));
         label_9->setText(QCoreApplication::translate("MainWindow", "IMU Sensitivity:", nullptr));
-        IRBeamTriggered->setText(QCoreApplication::translate("MainWindow", "IR Beam Triggered:", nullptr));
-        IRCameraTriggered->setText(QCoreApplication::translate("MainWindow", "IR camera Triggered:", nullptr));
-        VelostatTriggered->setText(QCoreApplication::translate("MainWindow", "Velostat triggered:", nullptr));
+        label_24->setText(QCoreApplication::translate("MainWindow", "IR Beam Triggered:", nullptr));
+        IRBeamTriggeredIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
+        label_22->setText(QCoreApplication::translate("MainWindow", "IR Camera Triggered:", nullptr));
+        IRCameraTriggeredIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
+        label_26->setText(QCoreApplication::translate("MainWindow", "Velostat Triggered:", nullptr));
+        VelostatTriggeredIndicator->setText(QCoreApplication::translate("MainWindow", "None", nullptr));
         menuFile->setTitle(QCoreApplication::translate("MainWindow", "File", nullptr));
         menuHelp->setTitle(QCoreApplication::translate("MainWindow", "Help", nullptr));
         menuPreferences->setTitle(QCoreApplication::translate("MainWindow", "Preferences", nullptr));
