@@ -87,7 +87,7 @@ public:
     QHBoxLayout *horizontalLayout_4;
     QLabel *label_7;
     QSpacerItem *horizontalSpacer_3;
-    QLineEdit *PolePositionBox;
+    QLineEdit *PoleGateNumberBox;
     QHBoxLayout *horizontalLayout_5;
     QLabel *label_8;
     QSpacerItem *horizontalSpacer_4;
@@ -159,7 +159,9 @@ public:
         treeView->setFont(font1);
         treeView->setLayoutDirection(Qt::LeftToRight);
         treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        treeView->setAlternatingRowColors(true);
+        treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        treeView->setProperty("showDropIndicator", QVariant(false));
+        treeView->setAlternatingRowColors(false);
         treeView->setSelectionBehavior(QAbstractItemView::SelectRows);
         treeView->setTextElideMode(Qt::ElideMiddle);
         treeView->setIndentation(0);
@@ -417,14 +419,14 @@ public:
 
         horizontalLayout_4->addItem(horizontalSpacer_3);
 
-        PolePositionBox = new QLineEdit(layoutWidget1);
-        PolePositionBox->setObjectName("PolePositionBox");
-        sizePolicy.setHeightForWidth(PolePositionBox->sizePolicy().hasHeightForWidth());
-        PolePositionBox->setSizePolicy(sizePolicy);
-        PolePositionBox->setMaximumSize(QSize(70, 16777215));
-        PolePositionBox->setBaseSize(QSize(50, 0));
+        PoleGateNumberBox = new QLineEdit(layoutWidget1);
+        PoleGateNumberBox->setObjectName("PoleGateNumberBox");
+        sizePolicy.setHeightForWidth(PoleGateNumberBox->sizePolicy().hasHeightForWidth());
+        PoleGateNumberBox->setSizePolicy(sizePolicy);
+        PoleGateNumberBox->setMaximumSize(QSize(70, 16777215));
+        PoleGateNumberBox->setBaseSize(QSize(50, 0));
 
-        horizontalLayout_4->addWidget(PolePositionBox, 0, Qt::AlignLeft);
+        horizontalLayout_4->addWidget(PoleGateNumberBox, 0, Qt::AlignLeft);
 
 
         verticalLayout->addLayout(horizontalLayout_4);
@@ -680,7 +682,7 @@ public:
         ReCalibratePoleButton->setText(QCoreApplication::translate("MainWindow", "Re-Calibrate", nullptr));
         label_5->setText(QCoreApplication::translate("MainWindow", "Pole Type:", nullptr));
         label_6->setText(QCoreApplication::translate("MainWindow", "Pole Partner:", nullptr));
-        label_7->setText(QCoreApplication::translate("MainWindow", "Pole Position:", nullptr));
+        label_7->setText(QCoreApplication::translate("MainWindow", "Gate Number:", nullptr));
         label_8->setText(QCoreApplication::translate("MainWindow", "Touch sensitivity:", nullptr));
         label_12->setText(QCoreApplication::translate("MainWindow", "Pole HWID:", nullptr));
         label_11->setText(QCoreApplication::translate("MainWindow", "Pole Battery:", nullptr));

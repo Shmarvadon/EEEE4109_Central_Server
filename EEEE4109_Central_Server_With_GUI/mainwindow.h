@@ -26,10 +26,11 @@ public slots:
 
     void handleTreeViewClicked();
 
-    void handlePolePositionInput() {};
-    void handleIRFrequencyInput() {};
-    void handleTouchSensitivityInput() {};
-    void handleIMUSensitivityInput() {};
+    void handleIRFrequencyInput();
+    void handleTouchSensitivityInput();
+    void handleIMUSensitivityInput();
+
+    void handleGateNumberInput();
 
     void handleFindPolePartnerButtonClicked(bool checked) { if (_currentlySelectedPole != nullptr) _poleList->findPartnerToPole(_currentlySelectedPole); };
 

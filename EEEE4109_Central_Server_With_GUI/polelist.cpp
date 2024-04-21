@@ -1,4 +1,5 @@
 #include "polelist.h"
+#include "gate.h"
 
 PoleDataModel::PoleDataModel(int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : _rootItem(new TreeViewHeader(this, QVariantList{ tr("Pole Name"), tr("Battery"), tr("Status"), tr("Partner"), tr("Gate Number") })) {
 	
@@ -50,10 +51,6 @@ QVariant PoleDataModel::data(const QModelIndex& index, int role) const {
 
 
 	if (!index.isValid() || role != Qt::DisplayRole) return {};
-
-	
-
-	//return static_cast<TreeViewHeader*>(index.internalPointer())->data(index.column());
 }
 
 Qt::ItemFlags PoleDataModel::flags(const QModelIndex& index) const {
@@ -100,8 +97,8 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 		pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
 
 		// Iterate over all Photodiode poles that do not have a partner yet.
-		for (auto& pole : _poles) {
-			if (pole->getPoleType() == PhotoDiodePole && pole->getPolePartnerID() == -1) {
+		for (auto* pole : _poles) {
+			if (pole->getPoleType() == PhotoDiodePole && pole->getPolePartner() == nullptr) {
 				polestate* pPoleState = pole->getPoleState();
 
 				// Setup this pole to recieve the transmission.
@@ -117,8 +114,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				if (pPoleState->Sensors.IRGateReading >= 14500 && pPoleState->Sensors.IRGateReading <= 15500) {
 
 					// Assign the poles as eachothers partner.
-					pPole->setPolePartnerID(pole->getPoleSessionID());
-					pole->setPolePartnerID(pPole->getPoleSessionID());
+					_Gates.push_back(new Gate((Pole*)pole, (Pole*)pPole, &_Gates));
 
 					// Turn off the IR LEDs on the LED pole.
 					pPole->getPoleState()->Settings.powerState ^= pps::IRBeamOn;
@@ -142,7 +138,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 
 		// Iterate over all poles that are of LED type and do not have a partner pole assigned to them yet.
 		for (auto& pole : _poles) {
-			if (pole->getPoleType() == LEDPole && pole->getPolePartnerID() == -1) {
+			if (pole->getPoleType() == LEDPole && pole->getPolePartner() == nullptr) {
 				polestate* pPoleState = pole->getPoleState();
 
 				pPoleState->Settings.IRTransmitFreq = 15000;	// Set frequency to 15khz.
@@ -162,8 +158,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				if (pPole->getPoleState()->Sensors.IRGateReading >= 14500 && pPole->getPoleState()->Sensors.IRGateReading <= 15500) {
 
 					// Assign the poles as eachothers partner.
-					pPole->setPolePartnerID(pole->getPoleSessionID());
-					pole->setPolePartnerID(pPole->getPoleSessionID());
+					_Gates.push_back(new Gate((Pole*)pole, (Pole*)pPole, &_Gates));
 
 					// Update the visual in the treeview.
 					updateVisual();

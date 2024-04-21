@@ -332,6 +332,16 @@
                <height>0</height>
               </size>
              </property>
+             <item>
+              <property name="text">
+               <string>DownStream</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>UpStream</string>
+              </property>
+             </item>
             </widget>
            </item>
           </layout>
@@ -684,7 +694,7 @@
                </font>
               </property>
               <property name="text">
-               <string>Pole Position:</string>
+               <string>Gate Number:</string>
               </property>
              </widget>
             </item>
@@ -702,7 +712,7 @@
              </spacer>
             </item>
             <item alignment="Qt::AlignLeft">
-             <widget class="QLineEdit" name="PolePositionBox">
+             <widget class="QLineEdit" name="PoleGateNumberBox">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                 <horstretch>0</horstretch>

@@ -16,13 +16,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 
     connect(_ui->treeView, &QTreeView::clicked, this, &MainWindow::handleTreeViewClicked);
-    connect(_ui->PolePositionBox, &QLineEdit::returnPressed, this, &MainWindow::handlePolePositionInput);
-
     connect(_ui->PoleIRFrequencyInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleIRFrequencyInput);
-    connect(_ui->TouchSensitivityInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleTouchSensitivityInput);
 
+    connect(_ui->TouchSensitivityInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleTouchSensitivityInput);
     connect(_ui->IMUSensitivityInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleIMUSensitivityInput);
+
     connect(_ui->FindGateButton, &QPushButton::clicked, this, &MainWindow::handleFindPolePartnerButtonClicked);
+    connect(_ui->GateNumberInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleGateNumberInput);
 
     _ui->PoleStatusViewSection->setCurrentIndex(0);
 }
@@ -59,9 +59,9 @@ void MainWindow::handleTreeViewClicked() {
     _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Grey_Circle.png"));
     _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Grey_Circle.png"));
 
-    // Grey out the gate configuration options if the selected pole does not have an assigned partner.
-    (pPole->getPolePartnerID() == -1) ? _ui->GateNumberInputBox->setDisabled(true) : _ui->GateNumberInputBox->setDisabled(false);
-    (pPole->getPolePartnerID() == -1) ? _ui->GatePassageDirectionSelector->setDisabled(true) :   _ui->GatePassageDirectionSelector->setDisabled(false);
+    // Grey out the Gate configuration options if the selected pole does not have an assigned partner.
+    (pPole->getPolePartner() == nullptr) ? _ui->GateNumberInputBox->setDisabled(true) : _ui->GateNumberInputBox->setDisabled(false);
+    (pPole->getPolePartner() == nullptr) ? _ui->GatePassageDirectionSelector->setDisabled(true) :   _ui->GatePassageDirectionSelector->setDisabled(false);
 
 
 
@@ -76,7 +76,7 @@ void MainWindow::handleTreeViewClicked() {
     connect(pPole, &Pole::VisualisePolePartner, _ui->PolePartnerBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualisePoleBattery, _ui->PoleBatteryBox, &QLineEdit::setText);
 
-    connect(pPole, &Pole::VisualisePolePosition, _ui->PolePositionBox, &QLineEdit::setText);
+    connect(pPole, &Pole::VisualisePoleGateNumber, _ui->PoleGateNumberBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualiseIRBeamFrequency, _ui->PoleIRFrequencyInputBox, &QLineEdit::setText);
 
     connect(pPole, &Pole::VisualiseTouchSensitivity, _ui->TouchSensitivityInputBox, &QLineEdit::setText);
@@ -90,22 +90,28 @@ void MainWindow::handleTreeViewClicked() {
 
 }
 
-
 void MainWindow::updatePoleEventsVisualIndicators(events eventsData) {
 
-    (eventsData & IRBeamTriggered) ? _ui->IRBeamTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->IRBeamTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+    if (_currentlySelectedPole->getPoleType() == LEDPole) {
+        (eventsData & IRCameraTriggered) ? _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
 
-    (eventsData & IRCameraTriggered) ? _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+        (eventsData & VelostatTriggered) ? _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
 
-    (eventsData & VelostatTriggered) ? _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+        (eventsData & Knocked) ? _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
 
-    (eventsData & Knocked) ? _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+        if (eventsData & KayakerPassageDirectionLTR) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Green_Up_Arrow.png"));
+        if (eventsData & KayakerPassageDirectionRTL) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Green_Down_Arrow.png"));
+        if (eventsData & KayakerPassageDirectionNone) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Grey_Circle.png"));
+    }
 
-    if (eventsData & KayakerPassageDirectionLTR) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Green_Up_Arrow.png"));
-    if (eventsData & KayakerPassageDirectionRTL) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Green_Down_Arrow.png"));
-    if (eventsData & KayakerPassageDirectionNone) _ui->PassageDirectionIndicator->setPixmap(QPixmap(":/Events/Grey_Circle.png"));
+    if (_currentlySelectedPole->getPoleType() == PhotoDiodePole) {
+        (eventsData & IRBeamTriggered) ? _ui->IRBeamTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->IRBeamTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+
+        (eventsData & VelostatTriggered) ? _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->VelostatTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+
+        (eventsData & Knocked) ? _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Green_Circle.png")) : _ui->PoleKnockedIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Red_Circle.png"));
+    }
 }
-
 
 void MainWindow::setPowerStateIndicator(pps::PolePowerState powerState) {
     
@@ -122,4 +128,22 @@ void MainWindow::setPowerStateIndicator(pps::PolePowerState powerState) {
     if (powerState == pps::PoleHibernating) {
         _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Sleep_Icon.png")); return;
     }
+}
+
+void MainWindow::handleIRFrequencyInput() {
+    if (_currentlySelectedPole != nullptr) _currentlySelectedPole->setIRFrequency(_ui->PoleGateNumberBox->text().toInt());
+}
+
+void MainWindow::handleTouchSensitivityInput() {
+    if (_currentlySelectedPole != nullptr) _currentlySelectedPole->setVelostatSensitivity(_ui->VelostatTriggeredIndicator->text().toInt());
+}
+
+void MainWindow::handleIMUSensitivityInput() {
+    if (_currentlySelectedPole != nullptr) _currentlySelectedPole->setIMUSensitivity(_ui->IMUSensitivityInputBox->text().toInt());
+}
+
+void MainWindow::handleGateNumberInput() {
+    
+    if (_currentlySelectedPole->getGate() != nullptr)  _currentlySelectedPole->getGate()->setGatePosition(_ui->GateNumberInputBox->text().toInt());
+
 }

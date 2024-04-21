@@ -6,6 +6,7 @@
 
 class PoleDataModel;
 class Pole;
+class Gate;
 
 class udplistnerthread : public QThread {
     Q_OBJECT
@@ -72,6 +73,7 @@ private:
     /*			My Stuff :)			*/
 
     std::vector<Pole*> _poles;
+    std::vector<Gate*> _Gates;
     udplistnerthread* _UDPListnerThread;
 };
 

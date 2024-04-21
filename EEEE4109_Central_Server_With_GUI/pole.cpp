@@ -1,12 +1,12 @@
 #include "polelist.h"
 
+#include "gate.h"
 
 Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessionId, uint64_t HWID, uint8_t type) : _sessionId(sessionId), _poleHWID(HWID), _poleType(type), _Model(model), _parentItem(parentItem) {
 	
 	// Set default values for stuffs.
 	_selected = false;
-	_polePartner = -1;
-	_gateNumber = -1;
+	_Gate = nullptr;
 
 
 	// Set connections to PoleDataModel class.
@@ -76,12 +76,12 @@ int Pole::columnCount() const {
 
 QVariant Pole::data(int column) const {
 
-	switch (column){
+	switch (column) {
 	case 0: return QVariant(("Pole " + std::to_string(_sessionId)).c_str());
-	case 1: return QVariant((std::to_string(_poleState.Sensors.batteryReading) + (const char *)"%").c_str());
+	case 1: return QVariant((std::to_string(_poleState.Sensors.batteryReading) + (const char*)"%").c_str());
 	case 2: return (_connstat == pcs::Connected) ? QVariant("Connected") : QVariant("Disconnected");
-	case 3: return (_polePartner == -1) ? QVariant("No Partner") : QVariant(std::to_string(_polePartner).c_str());
-	case 4: return (_gateNumber == -1) ? QVariant("No Gate") : QVariant(std::to_string(_gateNumber).c_str());
+	case 4: return (_Gate == nullptr) ? QVariant("No Gate") : QVariant(std::to_string(_Gate->getGatePosition()).c_str());
+	case 3: if (_Gate != nullptr) return (_Gate->getPartnerPole(this) == nullptr) ? QVariant("None") : QVariant(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str());
 	}
 }
 
@@ -105,10 +105,10 @@ void Pole::setUISelection(bool selected) {
 		VisualisePoleType(QString(std::to_string(_poleType).c_str()));
 		VisualisePoleHWID(QString(std::to_string(_poleHWID).c_str()));
 
-		VisualisePolePartner(QString(std::to_string(_polePartner).c_str()));
+		if (_Gate != nullptr) (_Gate->getPartnerPole(this) == nullptr) ? VisualisePolePartner(QString("None")) : VisualisePolePartner(QString(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str()));
 		VisualisePoleBattery(QString(std::to_string(_poleState.Sensors.batteryReading).c_str()));
 
-		VisualisePolePosition(QString(std::to_string(_gateNumber).c_str()));
+		(_Gate == nullptr) ? VisualisePoleGateNumber(QString("None")) : VisualisePoleGateNumber(QString(std::to_string(_Gate->getGatePosition()).c_str()));
 		VisualiseIRBeamFrequency(QString(std::to_string(_poleState.Settings.IRTransmitFreq).c_str()));
 
 		VisualiseTouchSensitivity(QString(std::to_string(_poleState.Settings.velostatSensitivity).c_str()));
@@ -133,4 +133,29 @@ void Pole::UpdatePoleSensors(sensors newSensorData) {
 	emit updatetreeVisual();
 };
 
+void Pole::setIRFrequency(uint16_t newFreq) {
+	_poleState.Settings.IRTransmitFreq = newFreq;
 
+	syncSettingsToPole(_poleState.Settings);
+
+	// If this is the selected pole then tell the other pole to also adjust its frequency.
+	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIRFrequency(newFreq);
+}
+
+void Pole::setVelostatSensitivity(float newSensitivity) {
+	_poleState.Settings.velostatSensitivity = newSensitivity;
+
+	syncSettingsToPole(_poleState.Settings);
+
+	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
+	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setVelostatSensitivity(newSensitivity);
+}
+
+void Pole::setIMUSensitivity(float newSensitivity) {
+	_poleState.Settings.velostatSensitivity = newSensitivity;
+
+	syncSettingsToPole(_poleState.Settings);
+
+	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
+	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIMUSensitivity(newSensitivity);
+}

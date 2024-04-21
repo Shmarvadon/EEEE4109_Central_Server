@@ -12,12 +12,15 @@
 #include <qobject.h>
 #include <qtimer.h>
 
+#include "gate.h"
 
 #define TCP_BUFF_SIZE 128
 
 class PoleDataModel;
 class Pole;
 class TreeViewHeader;
+class Gate;
+
 
 // Pole Transmission Type.
 namespace ptt {
@@ -88,7 +91,7 @@ namespace pps{
 struct sensors {
 	// Sensor Readings.
 	float	velostatReading = 0;	// Velostat resistance.
-	float	IRGateReading = 0;		// IR gate detected freq.
+	float	IRGateReading = 0;		// IR Gate detected freq.
 	float	IRCameraReading = 0;	// IR camera motion vector.
 	float	IMUReading = 0;			// IMU acceleration reading.
 	int	batteryReading = 0;		// Battery voltage reading.
@@ -194,11 +197,18 @@ public:
 	uint8_t		getPoleType() { return _poleType; }
 	int			getPoleSessionID() { return _sessionId; }
 
-	int			getPolePartnerID() { return _polePartner; }
+	Pole*		getPolePartner() { return _Gate->getPartnerPole(this); }
 	void		setPoleSessionID(int newId) { _sessionId = newId; }
 
-	void		setPolePartnerID(int partnerId) { _polePartner = partnerId; }
+	void		setGate(Gate* newGate) { _Gate = newGate; }
+	Gate*		getGate() { return _Gate; }
+
+	//void		setPolePartner(Pole* partnerId) { (_poleType == LEDPole) ? _Gate->PhotodiodePole = partnerId : _Gate->LEDPole = partnerId; }
 	polestate*	getPoleState() { return &_poleState; }
+
+	void		setIRFrequency(uint16_t newFreq);
+	void		setVelostatSensitivity(float newSensitivity);
+	void		setIMUSensitivity(float newSensitivity);
 
 
 public slots:
@@ -213,9 +223,6 @@ public slots:
 	void UpdatePoleEvents(events newEventsData);
 	void UpdatePoleSensors(sensors newSensorData);
 
-
-	// From the UI inputs
-	//void UIUpdatedPolePositionValue();
 
 signals:
 
@@ -243,7 +250,7 @@ signals:
 	void VisualisePolePartner(QString text);
 	void VisualisePoleBattery(QString text);
 
-	void VisualisePolePosition(QString text);
+	void VisualisePoleGateNumber(QString text);
 	void VisualiseIRBeamFrequency(QString text);
 	
 	void VisualiseTouchSensitivity(QString text);
@@ -263,8 +270,7 @@ protected:
 
 	PoleDataModel* _Model;
 	int _sessionId;
-	int _gateNumber;
-	int _polePartner;
+	Gate* _Gate;
 	uint64_t _poleHWID;
 	uint8_t _poleType;
 	QThread _TCPListnerThread;
