@@ -21,6 +21,7 @@ Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessi
 
 	
 	this->connect(worker, &poletcpthread::UpdatePoleConnectionStatus, this, &Pole::UpdatePoleConnectionStatus);
+	this->connect(worker, &poletcpthread::UpdatePoleEvents, this, &Pole::UpdatePoleEvents);
 	this->connect(this, &Pole::startTCPThread, worker, &poletcpthread::run, Qt::BlockingQueuedConnection);
 	this->connect(this, &Pole::syncEventsToServer, worker, &poletcpthread::syncEventsToServer , Qt::BlockingQueuedConnection);
 	this->connect(this, &Pole::syncSensorReadingsToServer, worker, &poletcpthread::syncSensorReadingsToServer, Qt::BlockingQueuedConnection);
@@ -28,11 +29,11 @@ Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessi
 	this->connect(this, &Pole::syncSettingsToPole, worker, &poletcpthread::syncSettingsToPole, Qt::BlockingQueuedConnection);
 	this->connect(this, &Pole::StartRealtimeStream, worker, &poletcpthread::StartRealtimeStream, Qt::BlockingQueuedConnection);
 	this->connect(this, &Pole::EndRealtimeStream, worker, &poletcpthread::EndRealtimeStream, Qt::BlockingQueuedConnection);
-	_TCPListnerThread.start();
+	_TCPListnerThread.start(QThread::HighestPriority);
 
 	startTCPThread();
 
-	this->setProperty("height", QVariant(500));
+	//this->setProperty("height", QVariant(500));
 
 	
 	//_poleState.Events = syncEventsToServer();
@@ -102,7 +103,7 @@ void Pole::setUISelection(bool selected) {
 
 	// Update the boxes to read out real values.
 	if (selected) {
-		VisualisePoleType(QString(std::to_string(_poleType).c_str()));
+		(_poleType == PhotoDiodePole) ? VisualisePoleType(QString("Photodiode")) : VisualisePoleType(QString("LED"));
 		VisualisePoleHWID(QString(std::to_string(_poleHWID).c_str()));
 
 		if (_Gate != nullptr) (_Gate->getPartnerPole(this) == nullptr) ? VisualisePolePartner(QString("None")) : VisualisePolePartner(QString(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str()));
@@ -139,7 +140,7 @@ void Pole::setIRFrequency(uint16_t newFreq) {
 	syncSettingsToPole(_poleState.Settings);
 
 	// If this is the selected pole then tell the other pole to also adjust its frequency.
-	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIRFrequency(newFreq);
+	if (_selected && _Gate != nullptr) { if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIRFrequency(newFreq); }
 }
 
 void Pole::setVelostatSensitivity(float newSensitivity) {
@@ -148,14 +149,14 @@ void Pole::setVelostatSensitivity(float newSensitivity) {
 	syncSettingsToPole(_poleState.Settings);
 
 	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
-	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setVelostatSensitivity(newSensitivity);
+	if (_selected && _Gate != nullptr) { if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setVelostatSensitivity(newSensitivity); }
 }
 
 void Pole::setIMUSensitivity(float newSensitivity) {
-	_poleState.Settings.velostatSensitivity = newSensitivity;
+	_poleState.Settings.IMUSensitivity = newSensitivity;
 
 	syncSettingsToPole(_poleState.Settings);
 
 	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
-	if (_selected && _Gate != nullptr) if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIMUSensitivity(newSensitivity);
+	if (_selected && _Gate != nullptr) { if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIMUSensitivity(newSensitivity); }
 }

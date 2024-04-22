@@ -12,9 +12,11 @@
 #include <qobject.h>
 #include <qtimer.h>
 
+#include <iostream>
+
 #include "gate.h"
 
-#define TCP_BUFF_SIZE 128
+#define TCP_BUFF_SIZE 512
 
 class PoleDataModel;
 class Pole;
@@ -137,7 +139,7 @@ public:
 public slots:
 
 	void StartRealtimeStream() { _RealtimeStreamEnabled = true; _realtimeStreamTimer->start(10); };
-	void EndRealtimeStream() { _RealtimeStreamEnabled = false; _realtimeStreamTimer->start(10); };
+	void EndRealtimeStream() { _RealtimeStreamEnabled = false; _realtimeStreamTimer->stop(); };
 
 	// From Pole class.
 	sensors syncSensorReadingsToServer();				// Needs to be blocking call.

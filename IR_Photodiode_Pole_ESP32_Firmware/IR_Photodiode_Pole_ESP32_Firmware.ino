@@ -4,29 +4,13 @@
 #include <driver/adc.h>
 #include <driver/i2s.h>
 #include <dsps_fft2r.h>
+#include <ArduinoJson.h>
 
 
 /*      MISCELLANEOUS GLOBAL VARIABLES & DEFINES      */
 
 #define POLE_HWID (uint64_t)0
 #define POLE_TYPE (uint8_t)2
-
-
-/*      NETWORK COMMS STUFF     */
-
-const char* ssid = "network21iot";
-const char* password = "RCD-M40DAB";
-
-bool UDP_broadcast_Successful = false;
-uint32_t UDP_broadcast_Port = 42069;
-
-uint32_t Session_TCP_Port, Session_ID;
-String Server_IP_String;
-IPAddress Server_IP;
-char TCP_RecvBuffer[512];
-
-AsyncUDP udp;
-WiFiClient tcp;
 
 // Pole Transmission Type.
 namespace ptt {
@@ -47,9 +31,126 @@ namespace ptt {
 		Pong					=	0b10000010,	// Expected response from the pole.
 
 		StartEventFeed			=	0b10000100,	// Starts the realtime continuous streaming of scoring relevent data.
-		StopEventFeed			=	0b10001000	// Stops  the realtime continuous streaming of scoring relevent data.
+		StopEventFeed			=	0b10001000,	// Stops  the realtime continuous streaming of scoring relevent data.
+
+		SomethingWentWrong		=	0b10010000
 	};
 }
+ 
+namespace pcs {
+	enum PoleConnectionStatus : uint8_t {
+		Connected		=	0b00000001,
+		Disconnected	=	0b00000010,
+		Reconnecting	=	0b00000100,
+		Unknown			=	0b00001000
+	};
+}
+
+enum PoleType : uint8_t {
+	LEDPole				=	0b00000001,
+	PhotoDiodePole		=	0b00000010
+};
+
+namespace pps{
+	enum PolePowerState : uint8_t {
+		IRBeamOn			=	0b00000001,
+		IRCameraOn			=	0b00000010,
+		VelostatOn			=	0b00000100,
+		IMUOn				=	0b00001000,
+		PoleHibernating		=	0b00010000
+	};
+
+	inline PolePowerState operator|(PolePowerState a, PolePowerState b) {
+		return static_cast<PolePowerState>((uint8_t)a | (uint8_t)b);
+	}
+
+	inline PolePowerState operator^(PolePowerState a, PolePowerState b) {
+		return static_cast<PolePowerState>((uint8_t)a ^ (uint8_t)b);
+	}
+
+	inline PolePowerState& operator|=(PolePowerState& a, PolePowerState b) {
+		return a = a | b;
+	}
+
+	inline PolePowerState& operator^=(PolePowerState& a, PolePowerState b) {
+		return a = a ^ b;
+	}
+
+}
+
+struct sensors {
+	// Sensor Readings.
+	float	velostatReading = 0;	// Velostat resistance.
+	float	IRGateReading = 0;		// IR Gate detected freq.
+	float	IRCameraReading = 0;	// IR camera motion vector.
+	float	IMUReading = 0;			// IMU acceleration reading.
+	int	batteryReading = 0;		// Battery voltage reading.
+};
+
+enum events : uint8_t {
+
+	IRBeamTriggered					=	0b00000001,
+	Knocked							=	0b00000010,
+	VelostatTriggered				=	0b00000100,
+	IMUTriggered					=	0b00001000,
+	IRCameraTriggered				=	0b00010000,
+	KayakerPassageDirectionLTR		=	0b00100000,		// Left To Right (LTR) w.r.t IR camera.
+	KayakerPassageDirectionRTL		=	0b01000000,		// Right To Left (RTL) w.r.t IR camera.
+	KayakerPassageDirectionNone		=	0b10000000,		// Unknown passage direction.
+
+};
+
+inline events operator|(events a, events b) {
+  return static_cast<events>((uint8_t)a | (uint8_t)b);
+}
+
+inline events operator^(events a, events b) {
+  return static_cast<events>((uint8_t)a ^ (uint8_t)b);
+}
+
+inline events& operator|=(events& a, events b) {
+  return a = a | b;
+}
+
+inline events& operator^=(events& a, events b) {
+  return a = a ^ b;
+}
+
+struct settings {
+	// Configurables.
+	uint16_t IRTransmitFreq = 0;				// Frequency of IR LEDs.
+	float IMUSensitivity = 0;					// IMU sensitivity.
+	float velostatSensitivity = 0;			// Velostat sensitivity.
+	pps::PolePowerState powerState = (pps::PolePowerState)0;		// Set the power state of the pole.
+};
+
+struct polestate {
+	settings	Settings;
+	events		Events;
+	sensors		Sensors;
+};
+
+
+polestate PoleStatus;
+
+/*      NETWORK COMMS STUFF     */
+
+const char* ssid = "Pixel_8155";
+const char* password = "password";
+
+bool UDP_broadcast_Successful = false;
+uint32_t UDP_broadcast_Port = 42069;
+
+uint32_t Session_TCP_Port, Session_ID;
+String Server_IP_String;
+IPAddress Server_IP;
+char TCP_RecvBuffer[512];
+char TCP_SendBuffer[512];
+
+AsyncUDP udp;
+WiFiClient tcp;
+
+
 
 
 /*      IR PHOTODIODE STUFF     */
@@ -74,36 +175,57 @@ void setup() {
 
   // Setup the WiFi.
   SetupWiFi();
-  
+
   // Setup the photodiodes.
   Setup_IR_Photodiodes();
+
+  PoleStatus.Events = VelostatTriggered;
 
 }
 
 void loop() {
 
+  PoleStatus.Events ^= VelostatTriggered;
 
   if (tcp.available() > 0){
-    // put the recieved packet data into buffer up to 512 bytes.
-    for (int i = 0; i < 512; i++){
-      if (tcp.available() > 0 )TCP_RecvBuffer[i] = (uint8_t)tcp.read();
-      if (tcp.available() == 0) break;
-    }
 
-    Serial.println(TCP_RecvBuffer);
+    auto now = micros();
+
+    int to_read = (tcp.available() < 512) ? tcp.available() : 512;
+    for (int i = 0; i < to_read; i++) TCP_RecvBuffer[i] = tcp.read();
 
     if (TCP_RecvBuffer[0] & ptt::Ping){
-      tcp.print((char)130);
-      Serial.println("Recieved ping from server");
+      tcp.write((char)130);
+      //Serial.println("Recieved ping from server");
     }
 
     if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Events)){
-      Serial.println((int)TCP_RecvBuffer[0]);
-      Serial.println("Server has asked for sync of events.");
+      //Serial.println("Server has asked for sync of events.");
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      TCP_SendBuffer[1] = PoleStatus.Events;
+      tcp.write(TCP_SendBuffer);
     }
 
-    for (int i = 0; i < 512; i++) TCP_RecvBuffer[i] = (char)0;
+    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Sensors)){
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      memcpy(&TCP_SendBuffer[1], PoleStatus.Sensors.velostatReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[5], PoleStatus.Sensors.IRGateReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[9], PoleStatus.Sensors.IRCameraReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[13], PoleStatus.Sensors.IMUReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[17], PoleStatus.Sensors.batteryReading, sizeof(float));
+      tcp.write(TCP_SendBuffer);
+    }
+
+    memset(TCP_RecvBuffer,0, 512);
+    memset(TCP_SendBuffer,0, 512);
+
+    auto alsonow = micros();
+    Serial.println(alsonow - now);
+
+    tcp.flush();
   }
+
+
 }
 
 bool Check_IR_Beam_Broken(int* freqs, float* mags, int N){

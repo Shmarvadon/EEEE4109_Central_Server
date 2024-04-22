@@ -25,6 +25,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(_ui->GateNumberInputBox, &QLineEdit::returnPressed, this, &MainWindow::handleGateNumberInput);
 
     _ui->PoleStatusViewSection->setCurrentIndex(0);
+
+
+    FreeConsole();
+
+    // create a separate new console window
+    AllocConsole();
+
+    // attach the new console to this application’s process
+    AttachConsole(GetCurrentProcessId());
+
+    SetConsoleOutputCP(65001);
+
+    // reopen the std I/O streams to redirect I/O to the new console
+    freopen("CON", "w", stdout);
+    freopen("CON", "w", stderr);
+    freopen("CON", "r", stdin);
 }
 
 
@@ -60,8 +76,8 @@ void MainWindow::handleTreeViewClicked() {
     _ui->IRCameraTriggeredIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Grey_Circle.png"));
 
     // Grey out the Gate configuration options if the selected pole does not have an assigned partner.
-    (pPole->getPolePartner() == nullptr) ? _ui->GateNumberInputBox->setDisabled(true) : _ui->GateNumberInputBox->setDisabled(false);
-    (pPole->getPolePartner() == nullptr) ? _ui->GatePassageDirectionSelector->setDisabled(true) :   _ui->GatePassageDirectionSelector->setDisabled(false);
+    (pPole->getGate() == nullptr) ? _ui->GateNumberInputBox->setDisabled(true) : _ui->GateNumberInputBox->setDisabled(false);
+    (pPole->getGate() == nullptr) ? _ui->GatePassageDirectionSelector->setDisabled(true) :   _ui->GatePassageDirectionSelector->setDisabled(false);
 
 
 

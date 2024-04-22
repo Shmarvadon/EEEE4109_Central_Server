@@ -8,31 +8,17 @@ void poletcpthread::run() {
 	// Timer to handle keep alive of the link.
 	_mainLoopTimer = new QTimer(this);
 	_mainLoopTimer->setTimerType(Qt::PreciseTimer);
-	connect(_mainLoopTimer, &QTimer::timeout, this, &poletcpthread::mainLoop);
+	connect(_mainLoopTimer, &QTimer::timeout, this, &poletcpthread::mainLoop, Qt::DirectConnection);
 
 	_mainLoopTimer->start(1000);
 
 	//Setup realtime stream timer.
 	_realtimeStreamTimer = new QTimer(this);
 	_realtimeStreamTimer->setTimerType(Qt::PreciseTimer);
-	connect(_realtimeStreamTimer, &QTimer::timeout, this, &poletcpthread::_realtimeStreamingLoop);
+	connect(_realtimeStreamTimer, &QTimer::timeout, this, &poletcpthread::_realtimeStreamingLoop, Qt::DirectConnection);
 }
 
 void poletcpthread::mainLoop() {
-
-	// Run the bit we want to run.
-	//int nBytesReceived(0);
-	//ZeroMemory(_TCPRecieveBuffer, TCP_BUFF_SIZE);
-	//nBytesReceived = recv(_TCPSocket, _TCPRecieveBuffer, TCP_BUFF_SIZE, 0);	// Non blocking mode should be enabled.
-
-	// If the pole has phoned home, process the data it has sent.
-	//if (nBytesReceived > 0) {
-
-		// Set now as the last time the pole has been talked to.
-		//lastSynced = std::chrono::high_resolution_clock::now();
-
-	//}
-
 	// If the last transmission was more than 5000 ms ago then we ping to ask if the pole is alive.
 	auto now = std::chrono::high_resolution_clock::now() - lastSynced;
 	if ((uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(now).count() > 100) {
@@ -196,8 +182,8 @@ events poletcpthread::syncEventsToServer() {
 	_TCPRecieveBuffer[0] = ptt::SyncToServer | ptt::Events;
 	int result = send(_TCPSocket, _TCPRecieveBuffer, sizeof(char) * TCP_BUFF_SIZE, 0);
 
-	// Make the socket blocking & set timeout to 10ms.
-	_setSocketBlockingMode(true, 10);
+	// Make the socket blocking & set timeout to 500ms.
+	_setSocketBlockingMode(true, 1000);
 
 	// Recieve the reply from the server.
 	int nBytesReceived(0);
@@ -210,6 +196,12 @@ events poletcpthread::syncEventsToServer() {
 		// Set now as the last time the pole has been talked to.
 		lastSynced = std::chrono::high_resolution_clock::now();
 
+		completedSuccessfully = true;
+
+		//char something = _TCPRecieveBuffer[0];
+
+		//std::cout << (int)something << std::endl;
+
 		// If the reply is a sync to server reply & it is to update events then we deserialise it into the updated events struct.
 		if (_TCPRecieveBuffer[0] == ptt::SyncToServer | ptt::Events) {
 
@@ -220,6 +212,13 @@ events poletcpthread::syncEventsToServer() {
 
 		if (_TCPRecieveBuffer[0] == ptt::SomethingWentWrong) completedSuccessfully = false;	// CHeck not strictly needed but could allow for future enhanced handling.
 	}
+	else {
+		std::cout << "An Error occured.\n";
+
+		int error = WSAGetLastError();
+		std::cout << "Error is " << error << "\n";
+	}
+
 
 	// Make the socket not blocking.
 	_setSocketBlockingMode(false, 0);
