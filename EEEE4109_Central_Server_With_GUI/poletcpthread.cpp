@@ -24,6 +24,7 @@ void poletcpthread::mainLoop() {
 	if ((uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(now).count() > 100) {
 		_pingPole();
 	}
+	else emit UpdatePoleConnectionStatus(pcs::Connected);
 }
 
 void poletcpthread::_setupTCPConnection() {
@@ -91,10 +92,10 @@ bool poletcpthread::_pingPole() {
 	bool poleStillHere = false;
 	char pingPacket = ptt::Ping;
 
-	int result = send(_TCPSocket, &pingPacket, 1, 0);
-
 	// Make the socket blocking & set timeout to 50ms.
 	_setSocketBlockingMode(true, 50);
+
+	int result = send(_TCPSocket, &pingPacket, 1, 0);
 
 	// call recv.
 	result = recv(_TCPSocket, _TCPRecieveBuffer, TCP_BUFF_SIZE, 0);
@@ -133,12 +134,12 @@ sensors poletcpthread::syncSensorReadingsToServer() {
 	sensors newData;
 	bool completedSuccessfully = false;
 
+	// Make the socket blocking & set timeout to 10ms.
+	_setSocketBlockingMode(true, 10);
+
 	ZeroMemory(_TCPRecieveBuffer, TCP_BUFF_SIZE);
 	_TCPRecieveBuffer[0] = ptt::SyncToServer | ptt::Sensors;
 	int result = send(_TCPSocket, _TCPRecieveBuffer, sizeof(char) * TCP_BUFF_SIZE, 0);
-
-	// Make the socket blocking & set timeout to 10ms.
-	_setSocketBlockingMode(true, 10);
 
 	// Recieve the reply from the server.
 	int nBytesReceived(0);
@@ -175,15 +176,14 @@ sensors poletcpthread::syncSensorReadingsToServer() {
 
 events poletcpthread::syncEventsToServer() {
 	events newData = (events)0;
-
 	bool completedSuccessfully = false;
+
+	// Make the socket blocking & set timeout to 500ms.
+	_setSocketBlockingMode(true, 1000);
 
 	ZeroMemory(_TCPRecieveBuffer, TCP_BUFF_SIZE);
 	_TCPRecieveBuffer[0] = ptt::SyncToServer | ptt::Events;
 	int result = send(_TCPSocket, _TCPRecieveBuffer, sizeof(char) * TCP_BUFF_SIZE, 0);
-
-	// Make the socket blocking & set timeout to 500ms.
-	_setSocketBlockingMode(true, 1000);
 
 	// Recieve the reply from the server.
 	int nBytesReceived(0);
@@ -230,12 +230,12 @@ settings poletcpthread::syncSettingsToServer() {
 	settings newData;
 	bool completedSuccessfully = false;
 
+	// Make the socket blocking & set timeout to 500ms.
+	_setSocketBlockingMode(true, 1000);
+
 	ZeroMemory(_TCPRecieveBuffer, TCP_BUFF_SIZE);
 	_TCPRecieveBuffer[0] = ptt::SyncToServer | ptt::Configurables;
 	int result = send(_TCPSocket, _TCPRecieveBuffer, sizeof(char) * TCP_BUFF_SIZE, 0);
-
-	// Make the socket blocking & set timeout to 10ms.
-	_setSocketBlockingMode(true, 10);
 
 	// Recieve the reply from the server.
 	int nBytesReceived(0);
@@ -270,7 +270,7 @@ settings poletcpthread::syncSettingsToServer() {
 	return completedSuccessfully ? newData : throw std::runtime_error("Issue with syncing settings data to server");
 }
 
-void poletcpthread::_setSocketBlockingMode(bool blocking, int timeout) {
+void poletcpthread::_setSocketBlockingMode(bool blocking, uint32_t timeout) {
 
 	if (blocking) {
 		// Make the socket blocking.

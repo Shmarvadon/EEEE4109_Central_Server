@@ -65,11 +65,9 @@ enum PoleType : uint8_t {
 
 namespace pps{
 	enum PolePowerState : uint8_t {
-		IRBeamOn			=	0b00000001,
-		IRCameraOn			=	0b00000010,
-		VelostatOn			=	0b00000100,
-		IMUOn				=	0b00001000,
-		PoleHibernating		=	0b00010000
+		Hibernating = 0b00000001,
+		MediumPower = 0b00000010,
+		HighPower = 0b00000100
 	};
 
 	inline PolePowerState operator|(PolePowerState a, PolePowerState b) {
@@ -159,7 +157,7 @@ private:
 
 	void _setupTCPConnection();
 	bool _pingPole();
-	void _setSocketBlockingMode(bool block, int timeout);
+	void _setSocketBlockingMode(bool block, uint32_t timeout);
 
 	void _realtimeStreamingLoop();
 

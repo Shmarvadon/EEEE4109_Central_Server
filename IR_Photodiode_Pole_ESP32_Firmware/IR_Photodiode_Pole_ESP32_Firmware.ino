@@ -4,144 +4,27 @@
 #include <driver/adc.h>
 #include <driver/i2s.h>
 #include <dsps_fft2r.h>
-#include <ArduinoJson.h>
+#include <Adafruit_ICM20948.h>
+#include <CircularBuffer.hpp>
+#include "PoleStateDataStructures.h"
+
 
 
 /*      MISCELLANEOUS GLOBAL VARIABLES & DEFINES      */
-
 #define POLE_HWID (uint64_t)0
 #define POLE_TYPE (uint8_t)2
-
-// Pole Transmission Type.
-namespace ptt {
-	enum PoleTransmissionType : char {
-
-		/*			Normal data transmission enums	(High bit cleared)				*/	
-
-		SyncToPole				=	0b00000001,
-		SyncToServer			=	0b00000010,
-
-		Configurables			=	0b00000100,
-		Events					=	0b00001000,
-		Sensors					=	0b00010000,
-
-		/*			Ping, keep alive, reconnect & other	enums	(High bit set)			*/
-
-		Ping					=	0b10000001,	// Byte to send to check if pole is alive.
-		Pong					=	0b10000010,	// Expected response from the pole.
-
-		StartEventFeed			=	0b10000100,	// Starts the realtime continuous streaming of scoring relevent data.
-		StopEventFeed			=	0b10001000,	// Stops  the realtime continuous streaming of scoring relevent data.
-
-		SomethingWentWrong		=	0b10010000
-	};
-}
- 
-namespace pcs {
-	enum PoleConnectionStatus : uint8_t {
-		Connected		=	0b00000001,
-		Disconnected	=	0b00000010,
-		Reconnecting	=	0b00000100,
-		Unknown			=	0b00001000
-	};
-}
-
-enum PoleType : uint8_t {
-	LEDPole				=	0b00000001,
-	PhotoDiodePole		=	0b00000010
-};
-
-namespace pps{
-	enum PolePowerState : uint8_t {
-		IRBeamOn			=	0b00000001,
-		IRCameraOn			=	0b00000010,
-		VelostatOn			=	0b00000100,
-		IMUOn				=	0b00001000,
-		PoleHibernating		=	0b00010000
-	};
-
-	inline PolePowerState operator|(PolePowerState a, PolePowerState b) {
-		return static_cast<PolePowerState>((uint8_t)a | (uint8_t)b);
-	}
-
-	inline PolePowerState operator^(PolePowerState a, PolePowerState b) {
-		return static_cast<PolePowerState>((uint8_t)a ^ (uint8_t)b);
-	}
-
-	inline PolePowerState& operator|=(PolePowerState& a, PolePowerState b) {
-		return a = a | b;
-	}
-
-	inline PolePowerState& operator^=(PolePowerState& a, PolePowerState b) {
-		return a = a ^ b;
-	}
-
-}
-
-struct sensors {
-	// Sensor Readings.
-	float	velostatReading = 0;	// Velostat resistance.
-	float	IRGateReading = 0;		// IR Gate detected freq.
-	float	IRCameraReading = 0;	// IR camera motion vector.
-	float	IMUReading = 0;			// IMU acceleration reading.
-	int	batteryReading = 0;		// Battery voltage reading.
-};
-
-enum events : uint8_t {
-
-	IRBeamTriggered					=	0b00000001,
-	Knocked							=	0b00000010,
-	VelostatTriggered				=	0b00000100,
-	IMUTriggered					=	0b00001000,
-	IRCameraTriggered				=	0b00010000,
-	KayakerPassageDirectionLTR		=	0b00100000,		// Left To Right (LTR) w.r.t IR camera.
-	KayakerPassageDirectionRTL		=	0b01000000,		// Right To Left (RTL) w.r.t IR camera.
-	KayakerPassageDirectionNone		=	0b10000000,		// Unknown passage direction.
-
-};
-
-inline events operator|(events a, events b) {
-  return static_cast<events>((uint8_t)a | (uint8_t)b);
-}
-
-inline events operator^(events a, events b) {
-  return static_cast<events>((uint8_t)a ^ (uint8_t)b);
-}
-
-inline events& operator|=(events& a, events b) {
-  return a = a | b;
-}
-
-inline events& operator^=(events& a, events b) {
-  return a = a ^ b;
-}
-
-struct settings {
-	// Configurables.
-	uint16_t IRTransmitFreq = 0;				// Frequency of IR LEDs.
-	float IMUSensitivity = 0;					// IMU sensitivity.
-	float velostatSensitivity = 0;			// Velostat sensitivity.
-	pps::PolePowerState powerState = (pps::PolePowerState)0;		// Set the power state of the pole.
-};
-
-struct polestate {
-	settings	Settings;
-	events		Events;
-	sensors		Sensors;
-};
-
-
 polestate PoleStatus;
 
-/*      NETWORK COMMS STUFF     */
 
-const char* ssid = "Pixel_8155";
-const char* password = "password";
+
+/*      NETWORK COMMS STUFF     */
+const char* ssid = "network21iot";
+const char* password = "RCD-M40DAB";
 
 bool UDP_broadcast_Successful = false;
 uint32_t UDP_broadcast_Port = 42069;
 
-uint32_t Session_TCP_Port, Session_ID;
+uint32_t Session_TCP_Port;
 String Server_IP_String;
 IPAddress Server_IP;
 char TCP_RecvBuffer[512];
@@ -152,16 +35,31 @@ WiFiClient tcp;
 
 
 
-
 /*      IR PHOTODIODE STUFF     */
-
-#define FFT_BUFF_LENGTH 512
+#define FFT_BUFF_LENGTH 128
 size_t bytes_read;
 uint16_t DMA_InBuff[FFT_BUFF_LENGTH];
 float FFT_InBuff[FFT_BUFF_LENGTH*2];
 float FFT_OutBuff[FFT_BUFF_LENGTH/2];
+bool IR_Beam_On = true;
 
-float Detection_Freq;
+
+
+/*      IMU STUFF     */
+Adafruit_ICM20948 icm;
+Adafruit_Sensor *accelerometer;
+CircularBuffer<float,100> ICM_Accel_Readings;
+float Processed_IMU_Readings[100];
+bool IMU_On = true;
+
+
+
+/*      VELOSTAT STUFF      */
+bool Velostat_On = true;
+CircularBuffer<uint16_t, 100> Velostat_Readings;
+uint16_t Processed_Velostat_Readings[100];
+int Velostat_Current = 10; //mA
+
 
 
 /*      CODE AND OTHER STUFF      */
@@ -172,60 +70,180 @@ void setup() {
   // Setup serial.
   Serial.begin(115200);
 
-
-  // Setup the WiFi.
-  SetupWiFi();
+  // Setup the IMU.
+  Setup_IMU();
 
   // Setup the photodiodes.
   Setup_IR_Photodiodes();
 
+  // Setup the Velostat.
+  Setup_Velostat();
+
+  // Setup the WiFi.
+  SetupWiFi();
+
+
   PoleStatus.Events = VelostatTriggered;
 
+
+  // Set I2C to 400khz.
+  Wire.setClock(400000);
 }
 
 void loop() {
+  // Time the loop.
+  auto loopStart = micros();
 
-  PoleStatus.Events ^= VelostatTriggered;
+  // Run the networking stuff.
+  Networking_Loop();
 
-  if (tcp.available() > 0){
+  
+  // Run the photodiode stuff if turned on.
+  if (IR_Beam_On) (Check_IR_Beam_Broken(nullptr, nullptr, 0)) ? PoleStatus.Events |= IRBeamTriggered : PoleStatus.Events ^= IRBeamTriggered;
 
-    auto now = micros();
+
+  // Run the IMU stuff if turned on.
+  if (IMU_On) (IMU_Loop()) ? PoleStatus.Events |= IMUTriggered : PoleStatus.Events ^= IMUTriggered;
+
+  // Run the Velostat stuff if turned on.
+  if (Velostat_On) (Velostat_Loop()) ? PoleStatus.Events |= VelostatTriggered : PoleStatus.Events ^= VelostatTriggered;
+
+  // Time the loop.
+  auto loopEnd = micros();
+  Serial.println(loopEnd - loopStart);
+
+}
+
+void Networking_Loop(){
+  if (tcp.available() != 0){
+
+    memset(TCP_RecvBuffer,0, 512);
+    memset(TCP_SendBuffer,0, 512);
 
     int to_read = (tcp.available() < 512) ? tcp.available() : 512;
     for (int i = 0; i < to_read; i++) TCP_RecvBuffer[i] = tcp.read();
+    //int i = 0;
+    //while (tcp.available() > 0) {TCP_RecvBuffer[i] = tcp.read(); i++;}
 
+    // If the server pings.
     if (TCP_RecvBuffer[0] & ptt::Ping){
       tcp.write((char)130);
+
+      return;
       //Serial.println("Recieved ping from server");
     }
 
+    // If the server asks for events.
     if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Events)){
       //Serial.println("Server has asked for sync of events.");
       TCP_SendBuffer[0] = TCP_RecvBuffer[0];
       TCP_SendBuffer[1] = PoleStatus.Events;
       tcp.write(TCP_SendBuffer);
+
+      return;
     }
 
+    // If the server asks for a copy of the sensor values.
     if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Sensors)){
       TCP_SendBuffer[0] = TCP_RecvBuffer[0];
-      memcpy(&TCP_SendBuffer[1], PoleStatus.Sensors.velostatReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[5], PoleStatus.Sensors.IRGateReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[9], PoleStatus.Sensors.IRCameraReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[13], PoleStatus.Sensors.IMUReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[17], PoleStatus.Sensors.batteryReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[1], &PoleStatus.Sensors.velostatReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[5], &PoleStatus.Sensors.IRGateReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[9], &PoleStatus.Sensors.IRCameraReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[13], &PoleStatus.Sensors.IMUReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[17], &PoleStatus.Sensors.batteryReading, sizeof(int));
       tcp.write(TCP_SendBuffer);
+
+      return;
     }
 
-    memset(TCP_RecvBuffer,0, 512);
-    memset(TCP_SendBuffer,0, 512);
+    // If the server asks for a copy of the settings.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Configurables)){
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      memcpy(&TCP_SendBuffer[1], &PoleStatus.Settings.IRTransmitFreq, sizeof(uint16_t));
+      memcpy(&TCP_SendBuffer[3], &PoleStatus.Settings.IMUSensitivity, sizeof(float));
+      memcpy(&TCP_SendBuffer[7], &PoleStatus.Settings.velostatSensitivity, sizeof(float));
+      memcpy(&TCP_SendBuffer[11], &PoleStatus.Settings.powerState, sizeof(uint8_t));
 
-    auto alsonow = micros();
-    Serial.println(alsonow - now);
+      tcp.write(TCP_SendBuffer);
 
-    tcp.flush();
+      return;
+    }
+
+    // If the server sends updated settings.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToPole | ptt::Configurables)){
+      memcpy(&PoleStatus.Settings.IRTransmitFreq, &TCP_RecvBuffer[1], sizeof(uint16_t));
+      memcpy(&PoleStatus.Settings.IMUSensitivity, &TCP_RecvBuffer[3], sizeof(float));
+      memcpy(&PoleStatus.Settings.velostatSensitivity, &TCP_RecvBuffer[7], sizeof(float));
+      memcpy(&PoleStatus.Settings.powerState, &TCP_RecvBuffer[11], sizeof(uint8_t));
+
+      // Call function to update power state stuffs.
+      UpdatePowerState();
+
+      return;
+    }
+
+    //tcp.flush();
   }
+}
 
+bool IMU_Loop(){
 
+  // Get updated values from IMU.
+  sensors_event_t accel;
+  accelerometer->getEvent(&accel);
+
+  float val = sqrt((accel.acceleration.x * accel.acceleration.x) + (accel.acceleration.y * accel.acceleration.y) + (accel.acceleration.z * accel.acceleration.z));
+  ICM_Accel_Readings.push(val);
+
+  float mean = 0;
+  float variance = 0;
+  // Calculate the mean and variance.
+  if (ICM_Accel_Readings.isFull()) {
+    for (int i = 0; i < 100; i++){
+      mean += ICM_Accel_Readings[i];
+    }
+
+    mean = mean / 100;
+
+    for (int i = 0; i < 100; i++){
+      variance += (ICM_Accel_Readings[i] - mean) * (ICM_Accel_Readings[i] - mean);
+    }
+
+    variance = variance / 100;
+
+    if (variance > PoleStatus.Settings.IMUSensitivity) return true;
+    else return false;
+  }
+}
+
+bool Velostat_Loop(){
+
+  // Read the value in.
+  uint16_t val = analogRead(34);
+
+  // Push it to circular buffer.
+  Velostat_Readings.push(val);
+
+  uint16_t mean = 0;
+  float variance = 0;
+  // Calculate the mean and variance.
+  if (Velostat_Readings.isFull()) {
+    for (int i = 0; i < 100; i++){
+      mean += Velostat_Readings[i];
+    }
+
+    mean = mean / 100;
+
+    for (int i = 0; i < 100; i++){
+      variance += (Velostat_Readings[i] - mean) * (Velostat_Readings[i] - mean);
+    }
+
+    variance = variance / 100;
+
+    // If the variance is too big (The resistance of the velostat is changing a bunch in the past 100 samples) we conclude we have been hit by measuring against threashold.
+    if (variance > PoleStatus.Settings.velostatSensitivity) return true;
+    else return false;
+  }
 }
 
 bool Check_IR_Beam_Broken(int* freqs, float* mags, int N){
@@ -252,7 +270,7 @@ bool Check_IR_Beam_Broken(int* freqs, float* mags, int N){
   float dominant_mag = 0;
   for (int i = 1; i < FFT_BUFF_LENGTH/2; i++){    // We dont care about the DC value.
     FFT_OutBuff[i] = sqrt(FFT_InBuff[i * 2 + 0] * FFT_InBuff[i * 2 + 0] + FFT_InBuff[i * 2 + 1] * FFT_InBuff[i * 2 + 1]) / FFT_BUFF_LENGTH;
-    if (FFT_OutBuff[i] > dominant_mag) {dominant_mag = FFT_OutBuff[i]; dominant_freq = (500*i);}
+    if (FFT_OutBuff[i] > dominant_mag) {dominant_mag = FFT_OutBuff[i]; dominant_freq = (1000*2*i);}
   }
 
   // If the programmer wants an in order list of the highest amplitude frequencies present then we do this.
@@ -271,18 +289,21 @@ bool Check_IR_Beam_Broken(int* freqs, float* mags, int N){
         }
       }
 
-      freqs[i] = test_max_diff_freq * 500;
+      freqs[i] = test_max_diff_freq * 1000 * 2;
       test_mag = FFT_OutBuff[test_max_diff_freq];
       mags[i] = FFT_OutBuff[test_max_diff_freq];
     }
   }
 
   // If within margin or error (the bin width) , 250Hz of the expected frequency then we probably have contact with the other pole.
-  if (abs(dominant_freq - Detection_Freq) <= 250) return true;
+  if (abs(dominant_freq - PoleStatus.Settings.IRTransmitFreq) <= 100) return true;
   else return false;
 }
 
 void Setup_IR_Photodiodes(){
+
+  // Turn on the IR photodiodes by sending a voltage to them.
+  dacWrite(26, 3300);
   
   // Setup FFT library.
   auto ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
@@ -315,9 +336,15 @@ void Setup_IR_Photodiodes(){
   float mags[40];
   int freqs[40];
   Check_IR_Beam_Broken(freqs, mags, 40);
+}
 
-  // Code here to tell server which channels are free to use and then try and locate master pole.
+void Turn_On_IR_Photodiodes(){
+  // Turn on the IR photodiodes by sending a voltage to them.
+  dacWrite(26, 3300);
+}
 
+void Turn_Off_IR_Photodiodes(){
+  dacWrite(26, 0);
 }
 
 void SetupWiFi(){
@@ -348,9 +375,7 @@ void SetupWiFi(){
       // Recieve UDP handshake reply from server and extract data from it.
       Serial.println("Recieved a UDP packet.");
       memcpy(&Session_TCP_Port, packet.data(), sizeof(uint32_t));
-      memcpy(&Session_ID, (void*)&packet.data()[3], sizeof(uint32_t));
       Serial.println(Session_TCP_Port);
-      Serial.println(Session_ID);
       Serial.println(packet.remoteIP().toString());
       Server_IP_String = packet.remoteIP().toString();
       Server_IP.fromString(Server_IP_String);
@@ -396,3 +421,45 @@ void SetupWiFi(){
   //udp.close();
 }
 
+void Setup_IMU(){
+  if (!icm.begin_I2C(104)){ Serial.println("Failed to find ICM chip on I2C bus."); while (true) delay(10);}
+  Serial.println("Found ICM chip!");
+  icm.setAccelRateDivisor(0);
+
+  accelerometer = icm.getAccelerometerSensor();
+
+}
+
+void Setup_Velostat(int Current){
+  dacWrite(25, (255 * Current) / 3300);
+}
+
+void UpdatePowerState(){
+
+  if (PoleStatus.Settings.powerState & pps::HighPower){
+    // Turn the photodiodes on.
+    if (!IR_Beam_On) Turn_On_IR_Photodiodes();
+    // Turn the IMU on.
+    if (!IMU_On) IMU_On = true;
+    // Also turn on velostat.
+    if (!Velostat_On) {Velostat_On = true; Setup_Velostat(10);}
+  }
+
+  if (PoleStatus.Settings.powerState & pps::MediumPower){
+    // Turn the photodiodes off.
+    if (IR_Beam_On) Turn_Off_IR_Photodiodes();
+    // Turn the IMU on.
+    if (!IMU_On) IMU_On = true;
+    // Also turn off velostat.
+    if (Velostat_On) {Velostat_On = false; Setup_Velostat(0);}
+  }
+
+  if (PoleStatus.Settings.powerState & pps::Hibernating){
+    // Turn the photodiodes off.
+    if (IR_Beam_On) Turn_Off_IR_Photodiodes();
+    // Turn the IMU off.
+    if (IMU_On) IMU_On = false;
+    // Also turn off velostat.
+    if (Velostat_On) {Velostat_On = false; Setup_Velostat(0);}
+  }
+}

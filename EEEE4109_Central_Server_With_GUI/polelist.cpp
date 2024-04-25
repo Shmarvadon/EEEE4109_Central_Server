@@ -90,7 +90,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 	if (pPole->getPoleType() == LEDPole) {
 
 		// Configure the LED pole to broadcast @15khz.
-		pPole->getPoleState()->Settings.powerState |= pps::IRBeamOn;
+		pPole->getPoleState()->Settings.powerState |= pps::HighPower;
 		pPole->getPoleState()->Settings.IRTransmitFreq = 15000;
 
 		// Sync the configuration to the pole.
@@ -102,7 +102,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				polestate* pPoleState = pole->getPoleState();
 
 				// Setup this pole to recieve the transmission.
-				pPoleState->Settings.powerState |= pps::IRBeamOn;	// Turn the IR beam on.
+				pPoleState->Settings.powerState |= pps::HighPower;	// Turn the IR beam on.
 
 				// Sync the new configuration to the pole.
 				pole->syncSettingsToPole(pPoleState->Settings);
@@ -117,7 +117,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 					_Gates.push_back(new Gate((Pole*)pole, (Pole*)pPole, &_Gates));
 
 					// Turn off the IR LEDs on the LED pole.
-					pPole->getPoleState()->Settings.powerState ^= pps::IRBeamOn;
+					pPole->getPoleState()->Settings.powerState ^= pps::HighPower;
 					pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
 
 					// Update the visual in the treeview.
@@ -133,7 +133,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 	if (pPole->getPoleType() == PhotoDiodePole) {
 
 		//Configure the pole to be ready to read its IR photodiode sensor.
-		pPole->getPoleState()->Settings.powerState |= pps::IRBeamOn;
+		pPole->getPoleState()->Settings.powerState |= pps::HighPower;
 		pPole->syncSettingsToPole(pPole->getPoleState()->Settings);
 
 		// Iterate over all poles that are of LED type and do not have a partner pole assigned to them yet.
@@ -142,7 +142,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				polestate* pPoleState = pole->getPoleState();
 
 				pPoleState->Settings.IRTransmitFreq = 15000;	// Set frequency to 15khz.
-				pPoleState->Settings.powerState |= pps::IRBeamOn;	// Turn the IR beam on.
+				pPoleState->Settings.powerState |= pps::HighPower;	// Turn the IR beam on.
 
 				// This makes the pole broadcast at this freq.
 				pole->syncSettingsToPole(pPoleState->Settings);
@@ -151,7 +151,7 @@ bool PoleDataModel::findPartnerToPole(Pole* pPole) {
 				pPole->getPoleState()->Sensors = pPole->syncSensorReadingsToServer();
 
 				// Turn off the IR beam on the LED pole now that we are done measuring the burst.
-				pPoleState->Settings.powerState ^= pps::IRBeamOn;
+				pPoleState->Settings.powerState ^= pps::MediumPower;
 				pole->syncSettingsToPole(pPoleState->Settings);
 
 				// If it detects the freq then we have found a match.

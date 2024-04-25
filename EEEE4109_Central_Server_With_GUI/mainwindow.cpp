@@ -132,16 +132,13 @@ void MainWindow::updatePoleEventsVisualIndicators(events eventsData) {
 void MainWindow::setPowerStateIndicator(pps::PolePowerState powerState) {
     
 
-    if (powerState & (pps::IRBeamOn | pps::IRCameraOn | pps::VelostatOn | pps::IMUOn)) {
+    if (powerState & pps::HighPower) {
         _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/High_Icon.png")); return;
     }
-    if (powerState & (pps::IRCameraOn | pps::IMUOn)) {
+    if (powerState & pps::MediumPower) {
         _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Medium_Icon.png")); return;
     }
-    if (powerState != pps::PoleHibernating) {
-        _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Low_Icon.png")); return;
-    }
-    if (powerState == pps::PoleHibernating) {
+    if (powerState == pps::Hibernating) {
         _ui->PowerStateIndicator->setPixmap(QPixmap(":/EventsIndicatorIcons/Sleep_Icon.png")); return;
     }
 }

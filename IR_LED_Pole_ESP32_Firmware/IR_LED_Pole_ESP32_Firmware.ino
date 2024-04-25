@@ -1,55 +1,72 @@
-
 #include "WiFi.h"
 #include "AsyncUDP.h"
 #include <driver/adc.h>
 #include <driver/i2s.h>
-#include <dsps_fft2r.h>
-#include <ArduinoJson.h>
-
+#include <Adafruit_ICM20948.h>
+#include <CircularBuffer.hpp>
+#include "PoleStateDataStructures.h"
 #include <driver/dac_continuous.h>
 
 
 /*      MISCELLANEOUS GLOBAL VARIABLES & DEFINES      */
-
 #define POLE_HWID 0
-bool Board_Type;
+#define POLE_TYPE (uint8_t)1
+polestate PoleStatus;
+
 
 
 /*      NETWORK COMMS STUFF     */
-
 const char* ssid = "network21iot";
 const char* password = "RCD-M40DAB";
 
 bool UDP_broadcast_Successful = false;
 uint32_t UDP_broadcast_Port = 42069;
 
-uint32_t Session_TCP_Port, Session_ID;
+uint32_t Session_TCP_Port;
 String Server_IP_String;
 IPAddress Server_IP;
 char TCP_RecvBuffer[512];
-
+char TCP_SendBuffer[512];
 AsyncUDP udp;
 WiFiClient tcp;
 
 
-/*      IR PHOTODIODE STUFF     */
-
-#define FFT_BUFF_LENGTH 512
-size_t bytes_read;
-uint16_t DMA_InBuff[FFT_BUFF_LENGTH];
-float FFT_InBuff[FFT_BUFF_LENGTH*2];
-float FFT_OutBuff[FFT_BUFF_LENGTH/2];
-
-float Detection_Freq;
-
 
 /*      IR LED STUFF     */
+uint8_t IR_LED_WaveForm[80];
+dac_continuous_handle_t* IR_LED_DMA_Handle = nullptr;
+bool IR_Beam_On = false;
 
-uint16_t  IR_LED_Freq;
-uint16_t  IR_LED_DUTY;  // Value out of 100 representing duty of the waveform.
-int  IR_LED_Amplitude = (100 * 255) / 3300;  // 100mV (100mA from VCCS).
-uint8_t IR_LED_WaveForm[100];
-dac_continuous_handle_t IR_LED_DMA_Handle;
+
+
+/*      IMU STUFF     */
+Adafruit_ICM20948 icm;
+Adafruit_Sensor *accelerometer;
+CircularBuffer<float,100> ICM_Accel_Readings;
+float Processed_IMU_Readings[100];
+bool IMU_On = true;
+
+
+
+/*      VELOSTAT STUFF      */
+bool Velostat_On = true;
+CircularBuffer<uint16_t, 100> Velostat_Readings;
+uint16_t Processed_Velostat_Readings[100];
+int Velostat_Current = 10; //mA
+
+
+
+/*      THERMAL CAMERA STUFF      */
+#define D6T_ADDR          0x0A
+#define D6T_READ_COMMAND  0x4C
+CircularBuffer<float, 100> IR_Camers_Readings;
+uint8_t IR_Camera_Receive_Buff[19];
+int16_t IR_Camera_Pixel_Data[8];
+int16_t IR_Camera_Weightings[8] = {-4, -3, -2, -1, 1, 2, 3, 4};
+
+
+
+
 
 
 
@@ -61,164 +78,249 @@ void setup() {
   // Setup serial.
   Serial.begin(115200);
 
+  // Setup the IMU.
+  Setup_IMU();
+
+  // Setup the Velostat.
+  Setup_Velostat(10);
 
   // Setup the WiFi.
   SetupWiFi();
 
-
-  // Determine if the board is Type 1 (IR Photodiode) or Type 0 (IR LEDs).
-  pinMode(32, INPUT);
-  int val = digitalRead(32);
-  if (val == HIGH) Board_Type = true;
-  else Board_Type = false;
-
-  if (Board_Type) Setup_IR_Photodiodes();
-
-
-  /*      EXAMPLE OF HOW TO DRIVE LEDs FROM SECOND CORE     */
-
-  // Set LEDs to run at 10kHz, 2% duty cycle & 100mV amplitude.
-  Run_LEDs(10000, 2, 100);  
-
-
+  // Set I2C to 400khz.
+  Wire.setClock(400000);
 }
 
 void loop() {
+  // Time the loop.
+  auto loopStart = micros();
 
-  if (tcp.available() > 0){
-    Serial.print((char)tcp.read());
+  // Run the networking stuff.
+  Networking_Loop();
 
-    if (tcp.available() == 0) {Serial.println();}
-  }
+  // Run the IMU stuff if turned on.
+  if (IMU_On) (IMU_Loop()) ? PoleStatus.Events |= IMUTriggered : PoleStatus.Events ^= IMUTriggered;
+
+  // Run the Velostat stuff if turned on.
+  if (Velostat_On) (Velostat_Loop()) ? PoleStatus.Events |= VelostatTriggered : PoleStatus.Events ^= VelostatTriggered;
+
+  // Time the loop.
+  auto loopEnd = micros();
+  Serial.println(loopEnd - loopStart);
 
 }
 
-bool Check_IR_Beam_Broken(int* freqs, float* mags, int N){
-  // Read the data from the I2S bus.
-  i2s_adc_enable(I2S_NUM_0);
-  size_t opt = i2s_read(I2S_NUM_0, &DMA_InBuff, sizeof(DMA_InBuff), &bytes_read,100);
-  i2s_adc_disable(I2S_NUM_0);
+void Networking_Loop(){
+  if (tcp.available() != 0){
 
-  // Move the numbers into FFT_InBuff to have FFT done on them.
-  for (int i = 0; i < FFT_BUFF_LENGTH; i++){
-    FFT_InBuff[i*2] = float((DMA_InBuff[i] & 4095) - 2048); // Normalise about 0.
-    FFT_InBuff[i*2 + 1] = 0.0f; // No complex value so 0.
+    memset(TCP_RecvBuffer,0, 512);
+    memset(TCP_SendBuffer,0, 512);
+
+    int to_read = (tcp.available() < 512) ? tcp.available() : 512;
+    for (int i = 0; i < to_read; i++) TCP_RecvBuffer[i] = tcp.read();
+    //int i = 0;
+    //while (tcp.available() > 0) {TCP_RecvBuffer[i] = tcp.read(); i++;}
+
+    // If the server pings.
+    if (TCP_RecvBuffer[0] & ptt::Ping){
+      tcp.write((char)130);
+
+      return;
+      //Serial.println("Recieved ping from server");
+    }
+
+    // If the server asks for events.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Events)){
+      //Serial.println("Server has asked for sync of events.");
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      TCP_SendBuffer[1] = PoleStatus.Events;
+      tcp.write(TCP_SendBuffer);
+
+      return;
+    }
+
+    // If the server asks for a copy of the sensor values.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Sensors)){
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      memcpy(&TCP_SendBuffer[1], &PoleStatus.Sensors.velostatReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[5], &PoleStatus.Sensors.IRGateReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[9], &PoleStatus.Sensors.IRCameraReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[13], &PoleStatus.Sensors.IMUReading, sizeof(float));
+      memcpy(&TCP_SendBuffer[17], &PoleStatus.Sensors.batteryReading, sizeof(int));
+      tcp.write(TCP_SendBuffer);
+
+      return;
+    }
+
+    // If the server asks for a copy of the settings.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Configurables)){
+      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
+      memcpy(&TCP_SendBuffer[1], &PoleStatus.Settings.IRTransmitFreq, sizeof(uint16_t));
+      memcpy(&TCP_SendBuffer[3], &PoleStatus.Settings.IMUSensitivity, sizeof(float));
+      memcpy(&TCP_SendBuffer[7], &PoleStatus.Settings.velostatSensitivity, sizeof(float));
+      memcpy(&TCP_SendBuffer[11], &PoleStatus.Settings.powerState, sizeof(uint8_t));
+
+      tcp.write(TCP_SendBuffer);
+
+      return;
+    }
+
+    // If the server sends updated settings.
+    if (TCP_RecvBuffer[0] == (ptt::SyncToPole | ptt::Configurables)){
+      memcpy(&PoleStatus.Settings.IRTransmitFreq, &TCP_RecvBuffer[1], sizeof(uint16_t));
+      memcpy(&PoleStatus.Settings.IMUSensitivity, &TCP_RecvBuffer[3], sizeof(float));
+      memcpy(&PoleStatus.Settings.velostatSensitivity, &TCP_RecvBuffer[7], sizeof(float));
+      memcpy(&PoleStatus.Settings.powerState, &TCP_RecvBuffer[11], sizeof(uint8_t));
+
+      // Call function to update power state stuffs.
+      UpdatePowerState();
+
+      return;
+    }
+
+    //tcp.flush();
   }
+}
 
-  // Perform the FFT.
-  dsps_fft2r_fc32(FFT_InBuff, FFT_BUFF_LENGTH);
-  // Reverse the bits.
-  dsps_bit_rev_fc32(FFT_InBuff, FFT_BUFF_LENGTH);
-  // Split out into 2 complex buffers.
-  dsps_cplx2reC_fc32(FFT_InBuff, FFT_BUFF_LENGTH);
+bool IMU_Loop(){
 
-  // Find the dominant frequency.
-  int dominant_freq = 0;
-  float dominant_mag = 0;
-  for (int i = 1; i < FFT_BUFF_LENGTH/2; i++){    // We dont care about the DC value.
-    FFT_OutBuff[i] = sqrt(FFT_InBuff[i * 2 + 0] * FFT_InBuff[i * 2 + 0] + FFT_InBuff[i * 2 + 1] * FFT_InBuff[i * 2 + 1]) / FFT_BUFF_LENGTH;
-    if (FFT_OutBuff[i] > dominant_mag) {dominant_mag = FFT_OutBuff[i]; dominant_freq = (500*i);}
+  // Get updated values from IMU.
+  sensors_event_t accel;
+  accelerometer->getEvent(&accel);
+
+  float val = sqrt((accel.acceleration.x * accel.acceleration.x) + (accel.acceleration.y * accel.acceleration.y) + (accel.acceleration.z * accel.acceleration.z));
+  ICM_Accel_Readings.push(val);
+
+  float mean = 0;
+  float variance = 0;
+  // Calculate the mean and variance.
+  if (ICM_Accel_Readings.isFull()) {
+    for (int i = 0; i < 100; i++){
+      mean += ICM_Accel_Readings[i];
+    }
+
+    mean = mean / 100;
+
+    for (int i = 0; i < 100; i++){
+      variance += (ICM_Accel_Readings[i] - mean) * (ICM_Accel_Readings[i] - mean);
+    }
+
+    variance = variance / 100;
+
+    if (variance > PoleStatus.Settings.IMUSensitivity) return true;
+    else return false;
   }
+}
 
-  // If the programmer wants an in order list of the highest amplitude frequencies present then we do this.
-  if (N != 0){
-    float test_mag = dominant_mag;
-    float test_max_diff = test_mag;
-    int test_max_diff_freq;
+bool Velostat_Loop(){
 
-    // Loop to find N frequencies.
-    for (int i = 0; i < N; i++){
-      for (int j = 0; j < FFT_BUFF_LENGTH/2;j++){ // Loop over each item in the FFT output.
+  // Read the value in.
+  uint16_t val = analogRead(34);
 
-        if (test_mag - FFT_OutBuff[j] < test_max_diff){ // If the difference is less than the current smallest.
-        test_max_diff = test_mag - FFT_OutBuff[j];
-        test_max_diff_freq = j;
-        }
-      }
+  // Push it to circular buffer.
+  Velostat_Readings.push(val);
 
-      freqs[i] = test_max_diff_freq * 500;
-      test_mag = FFT_OutBuff[test_max_diff_freq];
-      mags[i] = FFT_OutBuff[test_max_diff_freq];
+  uint16_t mean = 0;
+  float variance = 0;
+  // Calculate the mean and variance.
+  if (Velostat_Readings.isFull()) {
+    for (int i = 0; i < 100; i++){
+      mean += Velostat_Readings[i];
+    }
+
+    mean = mean / 100;
+
+    for (int i = 0; i < 100; i++){
+      variance += (Velostat_Readings[i] - mean) * (Velostat_Readings[i] - mean);
+    }
+
+    variance = variance / 100;
+
+    // If the variance is too big (The resistance of the velostat is changing a bunch in the past 100 samples) we conclude we have been hit by measuring against threashold.
+    if (variance > PoleStatus.Settings.velostatSensitivity) return true;
+    else return false;
+  }
+}
+
+void IR_Camera_Loop(){
+  // Read the data from the IR camera.
+  {
+    memset(IR_Camera_Receive_Buff, 0, 19);
+    Wire.beginTransmission(D6T_ADDR);
+    Wire.write(D6T_READ_COMMAND);
+    Wire.endTransmission();
+    Wire.requestFrom(D6T_ADDR, 19);
+
+    for (int i = 0; i < 19; i++){
+      IR_Camera_Receive_Buff[i] = Wire.read();
+    }
+
+    // Process the pixel data into an array of int16_t (Dont need floats just yet & they are computationally expensive to deal with).
+    for(int i = 1; i < 8 + 1; i++){
+      IR_Camera_Pixel_Data[i-1] = [&](){return (int16_t)((uint16_t)IR_Camera_Receive_Buff[ i * 2] | (uint16_t)IR_Camera_Receive_Buff[(i * 2) + 1] << 8);}();
     }
   }
 
-  // If within margin or error (the bin width) , 250Hz of the expected frequency then we probably have contact with the other pole.
-  if (abs(dominant_freq - Detection_Freq) <= 250) return true;
-  else return false;
-}
+  // Calculate the weighted position sum.
+  {
+    float sum = 0;
+    for (int i = 0; i < 8; i++){
+      sum += IR_Camera_Weighting[i] * IR_Camera_Pixel_Data[i];
+    }
 
-void Setup_IR_Photodiodes(){
-  
-  // Setup FFT library.
-  auto ret = dsps_fft2r_init_fc32(NULL, CONFIG_DSP_MAX_FFT_SIZE);
-  if (ret != ESP_OK){
-    Serial.println("Error with Initialising FFT library.");
+    IR_Camers_Readings.push(sum);
   }
 
-  // Setup I2S DMA to do very very fast sampling of ADC
-  // Config. Set sampling freq to 128kHz.
-  i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_ADC_BUILT_IN),
-    .sample_rate = 128000,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-    .communication_format = I2S_COMM_FORMAT_I2S_LSB,
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 2,
-    .dma_buf_len = FFT_BUFF_LENGTH,
-    .use_apll = false,
-    .tx_desc_auto_clear = false,
-    .fixed_mclk = 0
-  };
-
-  // Initialise the inter IC sound bus to sample from ADC1 Channel 5. Also set attenuation of the pin to an appropriate value.
-  i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
-  i2s_set_adc_mode(ADC_UNIT_1, ADC1_CHANNEL_5);
-  adc1_config_channel_atten(ADC1_CHANNEL_5, ADC_ATTEN_DB_11);
-
-  // Try to determine what frequencies if any of the IR beam are currently detectable.
-  float mags[40];
-  int freqs[40];
-  Check_IR_Beam_Broken(freqs, mags, 40);
-
-  // Code here to tell server which channels are free to use and then try and locate master pole.
-
+  // Perform linear regression on points to figure out which direction the kayaker is passing.
+  {
+    
+  }
 }
 
 void Run_LEDs(uint16_t Freq, uint16_t Duty_Cycle, uint16_t Amplitude){
   
   // Update global variables to allow querying of current freq & such of the output waveform.
-  IR_LED_Freq = Freq;
+  PoleStatus.Settings.IRTransmitFreq = Freq;
 
-  IR_LED_DUTY = Duty_Cycle;
+  Amplitude = (Amplitude * 255) / 3300;
 
-  IR_LED_Amplitude = (Amplitude * 255) / 3300;
+  Duty_Cycle /= 10;
 
   // Populate the buffer with waveform ready for DMA
-  for (int i = 0; i < 100; i++){
-    if ( i < IR_LED_DUTY)  IR_LED_WaveForm[i] = IR_LED_Amplitude;
+  for (int i = 0; i < 80; i++){
+    if ( (i % 10) < Duty_Cycle)  IR_LED_WaveForm[i] = Amplitude;
     else IR_LED_WaveForm[i] = 0;
   }
 
   //Configure the I2S peripherals to be ready to transmit waveform data.
   dac_continuous_config_t i2s_config = {
-        .chan_mask = DAC_CHANNEL_MASK_ALL,
+        .chan_mask = DAC_CHANNEL_MASK_CH1,
         .desc_num = 2,
         .buf_size = 100,
-        .freq_hz = Freq,
+        .freq_hz = Freq * 10,
         .offset = 0,
         .clk_src = DAC_DIGI_CLK_SRC_DEFAULT,
         .chan_mode = DAC_CHANNEL_MODE_SIMUL,
   };
 
-  dac_continuous_new_channels(&i2s_config, &IR_LED_DMA_Handle);
+  dac_continuous_new_channels(&i2s_config, IR_LED_DMA_Handle);
 
-  dac_continuous_enable(IR_LED_DMA_Handle);
+  dac_continuous_enable(*IR_LED_DMA_Handle);
 
   // Function to load the buffer into DMA and cyclically run the DAC conversion.
-  dac_continuous_write_cyclically(IR_LED_DMA_Handle, (uint8_t*)IR_LED_WaveForm, 100, NULL);
+  dac_continuous_write_cyclically(*IR_LED_DMA_Handle, (uint8_t*)IR_LED_WaveForm, 100, NULL);
 }
 
+void Stop_LEDs(){
+
+  // Should delete the cyclical DMA and stop it.
+  dac_continuous_del_channels(*IR_LED_DMA_Handle);
+  //dac_continuous_disable(IR_LED_DMA_HANDLE);
+
+  // Consult https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/peripherals/dac.html 
+  // If this code does not work.
+
+}
 
 void SetupWiFi(){
   // Setup WiFi Connection.
@@ -248,42 +350,123 @@ void SetupWiFi(){
       // Recieve UDP handshake reply from server and extract data from it.
       Serial.println("Recieved a UDP packet.");
       memcpy(&Session_TCP_Port, packet.data(), sizeof(uint32_t));
-      memcpy(&Session_ID, (void*)&packet.data()[3], sizeof(uint32_t));
       Serial.println(Session_TCP_Port);
-      Serial.println(Session_ID);
       Serial.println(packet.remoteIP().toString());
       Server_IP_String = packet.remoteIP().toString();
       Server_IP.fromString(Server_IP_String);
-      delay(50);
+
+      UDP_broadcast_Successful = true;
 
       // Attempt to setup TCP connection.
-      if(tcp.connect(Server_IP, Session_TCP_Port)){
-        Serial.println("TCP connection successful.");
+      for (int i = 0; i < 20; i++){
+        delay(100);
+        if(tcp.connect(Server_IP, Session_TCP_Port)){
+          Serial.println("TCP connection successful.");
+          return;
+        }
+        else{
+          Serial.println("TCP connection unsuccessful.");
+        }
       }
-      else{
-        Serial.println("TCP connection unsuccessful.");
-      }
-      UDP_broadcast_Successful = true;
+      
     });
   }
 
-    if (!udp.listen(UDP_broadcast_Port-1)){
+  if (!udp.listen(UDP_broadcast_Port-1)){
       Serial.println("Unable to setup UDP socket to listen for server reply.");
       exit(0);
   }
 
   while (!UDP_broadcast_Successful){
+    // Loop over sending out a broadcast with the poles HWID & Pole type information.
 
-    // Create JSON doc to place data in for handshake.
-    JsonDocument doc;
-    doc["HWID"] = String(POLE_HWID);
+    Serial.println("Sending UDP broadcast Now.");
 
-    serializeJson(doc,TCP_RecvBuffer);
+    // Populate buffer with information.
+    TCP_RecvBuffer[0] = POLE_HWID;
+    TCP_RecvBuffer[8] = POLE_TYPE;
+
     // Send the UDP broadcast.
-    udp.broadcastTo(TCP_RecvBuffer, UDP_broadcast_Port);
+    udp.broadcastTo((uint8_t*)&TCP_RecvBuffer, (size_t)512, (uint16_t)UDP_broadcast_Port);
     delay(1000);
 
   }
   Serial.println("UDP handshake with server successful. TCP connection established.");
 }
 
+void Setup_IMU(){
+  if (!icm.begin_I2C(104)){ Serial.println("Failed to find ICM chip on I2C bus."); while (true) delay(10);}
+  Serial.println("Found ICM chip!");
+  icm.setAccelRateDivisor(0);
+
+  accelerometer = icm.getAccelerometerSensor();
+
+}
+
+void Setup_Velostat(int Current){
+  dacWrite(25, (255 * Current) / 3300);
+}
+
+void Setup_IR_Camera(){
+    // Send initialization settings to D6T sensor
+    Wire.beginTransmission(D6T_ADDR); // I2C slave address
+    Wire.write(0x02);                  // D6T register
+    Wire.write(0x00);                  // Write Data
+    Wire.write(0x01);                  // Write Data
+    Wire.write(0xEE);                  // Write Data
+    Wire.endTransmission();            // I2C Stop
+    Wire.beginTransmission(D6T_ADDR);  // I2C slave address
+    Wire.write(0x05);                  // D6T register
+    Wire.write(0x90);                  // Write Data
+    Wire.write(0x3A);                  // Write Data
+    Wire.write(0xB8);                  // Write Data
+    Wire.endTransmission();            // I2C Stop
+    Wire.beginTransmission(D6T_ADDR);  // I2C slave address
+    Wire.write(0x03);                  // D6T register
+    Wire.write(0x00);                  // Write Data
+    Wire.write(0x03);                  // Write Data
+    Wire.write(0x8B);                  // Write Data
+    Wire.endTransmission();            // I2C Stop
+    Wire.beginTransmission(D6T_ADDR);  // I2C slave address
+    Wire.write(0x03);                  // D6T register
+    Wire.write(0x00);                  // Write Data
+    Wire.write(0x07);                  // Write Data
+    Wire.write(0x97);                  // Write Data
+    Wire.endTransmission();            // I2C Stop
+    Wire.beginTransmission(D6T_ADDR);  // I2C slave address
+    Wire.write(0x02);                  // D6T register
+    Wire.write(0x00);                  // Write Data
+    Wire.write(0x00);                  // Write Data
+    Wire.write(0xE9);                  // Write Data
+    Wire.endTransmission();            // I2C Stop
+}
+
+void UpdatePowerState(){
+
+  if (PoleStatus.Settings.powerState & pps::HighPower){
+    // Turn the LEDs on.
+    if (!IR_Beam_On) Run_LEDs(PoleStatus.Settings.IRTransmitFreq, 40, 500);
+    // Turn the IMU on.
+    if (!IMU_On) IMU_On = true;
+    // Also turn on velostat.
+    if (!Velostat_On) {Velostat_On = true; Setup_Velostat(10);}
+  }
+
+  if (PoleStatus.Settings.powerState & pps::MediumPower){
+    // Turn the LEDs off.
+    if (IR_Beam_On) Stop_LEDs();
+    // Turn the IMU on.
+    if (!IMU_On) IMU_On = true;
+    // Also turn off velostat.
+    if (Velostat_On) {Velostat_On = false; Setup_Velostat(0);}
+  }
+
+  if (PoleStatus.Settings.powerState & pps::Hibernating){
+    // Turn the LEDs off.
+    if (IR_Beam_On) Stop_LEDs();
+    // Turn the IMU off.
+    if (IMU_On) IMU_On = false;
+    // Also turn off velostat.
+    if (Velostat_On) {Velostat_On = false; Setup_Velostat(0);}
+  }
+}
