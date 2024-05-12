@@ -14,6 +14,8 @@
 
 #include <iostream>
 
+#include <format>
+
 #include "gate.h"
 
 #define TCP_BUFF_SIZE 512

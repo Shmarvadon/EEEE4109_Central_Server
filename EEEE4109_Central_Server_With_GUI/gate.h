@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+
 class Pole;
 
 class Gate {

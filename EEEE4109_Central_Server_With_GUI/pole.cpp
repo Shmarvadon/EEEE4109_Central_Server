@@ -103,7 +103,7 @@ void Pole::setUISelection(bool selected) {
 
 	// Update the boxes to read out real values.
 	if (selected) {
-		(_poleType == PhotoDiodePole) ? VisualisePoleType(QString("Photodiode")) : VisualisePoleType(QString("LED"));
+		(_poleType == PhotoDiodePole) ? VisualisePoleType(QString("Left")) : VisualisePoleType(QString("Right"));
 		VisualisePoleHWID(QString(std::to_string(_poleHWID).c_str()));
 
 		if (_Gate != nullptr) (_Gate->getPartnerPole(this) == nullptr) ? VisualisePolePartner(QString("None")) : VisualisePolePartner(QString(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str()));
@@ -112,8 +112,8 @@ void Pole::setUISelection(bool selected) {
 		(_Gate == nullptr) ? VisualisePoleGateNumber(QString("None")) : VisualisePoleGateNumber(QString(std::to_string(_Gate->getGatePosition()).c_str()));
 		VisualiseIRBeamFrequency(QString(std::to_string(_poleState.Settings.IRTransmitFreq).c_str()));
 
-		VisualiseTouchSensitivity(QString(std::to_string(_poleState.Settings.velostatSensitivity).c_str()));
-		VisualiseIMUSensitivity(QString(std::to_string(_poleState.Settings.IMUSensitivity).c_str()));
+		VisualiseTouchSensitivity(QString(std::to_string((int)_poleState.Settings.velostatSensitivity*100).c_str()));
+		VisualiseIMUSensitivity(QString(std::to_string((int)_poleState.Settings.IMUSensitivity * 100).c_str()));
 
 		// Start the realtime syncing of events data.
 		StartRealtimeStream();

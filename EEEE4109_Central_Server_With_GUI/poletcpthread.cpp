@@ -179,7 +179,7 @@ events poletcpthread::syncEventsToServer() {
 	bool completedSuccessfully = false;
 
 	// Make the socket blocking & set timeout to 500ms.
-	_setSocketBlockingMode(true, 1000);
+	_setSocketBlockingMode(true, 10000);
 
 	ZeroMemory(_TCPRecieveBuffer, TCP_BUFF_SIZE);
 	_TCPRecieveBuffer[0] = ptt::SyncToServer | ptt::Events;
