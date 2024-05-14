@@ -16,7 +16,7 @@ public:
         void run() override;
 
 signals:
-    void appendNewPole(int port, uint64_t HWID, uint8_t type);
+    void appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type);
 
 private:
     std::pair<uint32_t, uint32_t> _TCPPortsRange;
@@ -55,7 +55,7 @@ public:
 public slots:
 
     // From UDP listner thread.
-    void appendNewPole(int port, uint64_t HWID, uint8_t type);
+    void appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type);
 
     // From Pole class.
     void updateVisual(){ dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole }); }

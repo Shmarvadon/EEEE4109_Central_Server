@@ -67,10 +67,10 @@ TreeViewHeader* PoleDataModel::getRootItem() {
 	return _rootItem;
 }
 
-void PoleDataModel::appendNewPole(int port, uint64_t HWID, uint8_t type){
+void PoleDataModel::appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type){
 
 	// Create the new pole.
-	Pole* pole = new Pole(this, _rootItem, port, _poles.size(), HWID, type);
+	Pole* pole = new Pole(this, _rootItem, poleAddress, port, _poles.size(), HWID, type);
 
 	// Update the model.
 	beginInsertRows(QModelIndex(), _rootItem->childCount(), _rootItem->childCount());
@@ -280,8 +280,10 @@ void udplistnerthread::run() {
 		// Pack reply data into buffer.
 		memcpy(senderBuff, &polePort, sizeof(uint32_t));
 
+		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;
+
 		// Emit a signal to queue up the operation of appending the new pole to the _poles vector in the data model.
-		emit appendNewPole(polePort, poleHWID, poleType);
+		emit appendNewPole(senderRecieverAddress, polePort, poleHWID, poleType);
 
 		// Send the reply.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;

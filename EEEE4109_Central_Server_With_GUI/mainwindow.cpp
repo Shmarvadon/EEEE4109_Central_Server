@@ -60,6 +60,8 @@ void MainWindow::handleTreeViewClicked() {
     QModelIndex selectedIndex = _ui->treeView->currentIndex();
     _ui->PoleStatusViewSection->setCurrentIndex(1);
 
+    //throw std::runtime_error("");
+
     Pole* pPole = static_cast<Pole*>(selectedIndex.internalPointer());
 
     if (pPole->getPoleType() == (uint8_t)LEDPole)   _ui->PoleDiagramView->setCurrentIndex(0);
@@ -79,7 +81,7 @@ void MainWindow::handleTreeViewClicked() {
     (pPole->getGate() == nullptr) ? _ui->GateNumberInputBox->setDisabled(true) : _ui->GateNumberInputBox->setDisabled(false);
     (pPole->getGate() == nullptr) ? _ui->GatePassageDirectionSelector->setDisabled(true) :   _ui->GatePassageDirectionSelector->setDisabled(false);
 
-
+    //throw std::runtime_error("");
 
     // Save the currently selected pole.
     _currentlySelectedPole = pPole;
@@ -89,20 +91,32 @@ void MainWindow::handleTreeViewClicked() {
     connect(pPole, &Pole::VisualisePoleType, _ui->PoleTypeBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualisePoleHWID, _ui->PoleHWIDBox, &QLineEdit::setText);
 
+    //throw std::runtime_error("");
+
     connect(pPole, &Pole::VisualisePolePartner, _ui->PolePartnerBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualisePoleBattery, _ui->PoleBatteryBox, &QLineEdit::setText);
+
+    //throw std::runtime_error("");
 
     connect(pPole, &Pole::VisualisePoleGateNumber, _ui->PoleGateNumberBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualiseIRBeamFrequency, _ui->PoleIRFrequencyInputBox, &QLineEdit::setText);
 
+    //throw std::runtime_error("");
+
     connect(pPole, &Pole::VisualiseTouchSensitivity, _ui->TouchSensitivityInputBox, &QLineEdit::setText);
     connect(pPole, &Pole::VisualiseIMUSensitivity, _ui->IMUSensitivityInputBox, &QLineEdit::setText);
+
+    //throw std::runtime_error("");
 
     connect(pPole, &Pole::updatePoleEventsVisualIndicators, this, &MainWindow::updatePoleEventsVisualIndicators);
     connect(pPole, &Pole::setPowerStateIndicator, this, &MainWindow::setPowerStateIndicator);
 
+    //throw std::runtime_error("");
+
     // Tell the selected pole to set things up.
     pPole->setUISelection(true);
+
+    //throw std::runtime_error("");
 
 }
 

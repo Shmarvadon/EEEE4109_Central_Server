@@ -18,7 +18,7 @@
 
 #include "gate.h"
 
-#define TCP_BUFF_SIZE 512
+#define COMMS_BUFF_SIZE 512
 
 class PoleDataModel;
 class Pole;
@@ -126,11 +126,11 @@ struct polestate {
 	sensors		Sensors;
 };
 
-class poletcpthread : public QObject {
+class polecommsthread : public QObject {
 	Q_OBJECT
 
 public:
-	explicit poletcpthread(QObject* parent, int TCPPort) : _TCPPort(TCPPort), _RealtimeStreamEnabled(false) {};
+	explicit polecommsthread(QObject* parent, sockaddr_in poleAddress, int Port) : _Port(Port), _RealtimeStreamEnabled(false), _Dest(poleAddress) {};
 	
 	void run();
 
@@ -157,16 +157,17 @@ signals:
 
 private:
 
-	void _setupTCPConnection();
+	void _setupUDPConnection();
 	bool _pingPole();
 	void _setSocketBlockingMode(bool block, uint32_t timeout);
 
 	void _realtimeStreamingLoop();
 
 
-	int _TCPPort;
-	SOCKET _TCPSocket = INVALID_SOCKET;
-	char _TCPRecieveBuffer[TCP_BUFF_SIZE];
+	int _Port;
+	SOCKET _UDPSocket = INVALID_SOCKET;
+	sockaddr_in _Dest;
+	char _CommsBuffer[COMMS_BUFF_SIZE];
 	std::chrono::time_point<std::chrono::high_resolution_clock> lastSynced;
 	bool _RealtimeStreamEnabled;
 	QTimer* _mainLoopTimer,
@@ -180,7 +181,7 @@ public:
 	Q_DISABLE_COPY_MOVE(Pole)
 
 	/*			Constructors			*/	
-	explicit Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessionId, uint64_t HWID, uint8_t type);
+	explicit Pole(PoleDataModel* model, TreeViewHeader* parentItem, sockaddr_in poleAddress, int port, int sessionId, uint64_t HWID, uint8_t type);
 
 	~Pole();
 

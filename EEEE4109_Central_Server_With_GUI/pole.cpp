@@ -2,7 +2,7 @@
 
 #include "gate.h"
 
-Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessionId, uint64_t HWID, uint8_t type) : _sessionId(sessionId), _poleHWID(HWID), _poleType(type), _Model(model), _parentItem(parentItem) {
+Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, sockaddr_in poleAddress, int port, int sessionId, uint64_t HWID, uint8_t type) : _sessionId(sessionId), _poleHWID(HWID), _poleType(type), _Model(model), _parentItem(parentItem) {
 	
 	// Set default values for stuffs.
 	_selected = false;
@@ -14,21 +14,21 @@ Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, int port, int sessi
 	connect(this, &Pole::updatetreeVisual, model, &PoleDataModel::updateVisual);
 
 	// Configure the comms thread.
-	poletcpthread *worker = new poletcpthread(this, port);
+	polecommsthread *worker = new polecommsthread(this, poleAddress, port);
 
 	//throw std::runtime_error("");
 	worker->moveToThread(&_TCPListnerThread);
 
 	
-	this->connect(worker, &poletcpthread::UpdatePoleConnectionStatus, this, &Pole::UpdatePoleConnectionStatus);
-	this->connect(worker, &poletcpthread::UpdatePoleEvents, this, &Pole::UpdatePoleEvents);
-	this->connect(this, &Pole::startTCPThread, worker, &poletcpthread::run, Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::syncEventsToServer, worker, &poletcpthread::syncEventsToServer , Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::syncSensorReadingsToServer, worker, &poletcpthread::syncSensorReadingsToServer, Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::syncSettingsToServer, worker, &poletcpthread::syncSettingsToServer, Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::syncSettingsToPole, worker, &poletcpthread::syncSettingsToPole, Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::StartRealtimeStream, worker, &poletcpthread::StartRealtimeStream, Qt::BlockingQueuedConnection);
-	this->connect(this, &Pole::EndRealtimeStream, worker, &poletcpthread::EndRealtimeStream, Qt::BlockingQueuedConnection);
+	this->connect(worker, &polecommsthread::UpdatePoleConnectionStatus, this, &Pole::UpdatePoleConnectionStatus);
+	this->connect(worker, &polecommsthread::UpdatePoleEvents, this, &Pole::UpdatePoleEvents);
+	this->connect(this, &Pole::startTCPThread, worker, &polecommsthread::run, Qt::BlockingQueuedConnection);
+	this->connect(this, &Pole::syncEventsToServer, worker, &polecommsthread::syncEventsToServer , Qt::BlockingQueuedConnection);
+	this->connect(this, &Pole::syncSensorReadingsToServer, worker, &polecommsthread::syncSensorReadingsToServer, Qt::BlockingQueuedConnection);
+	this->connect(this, &Pole::syncSettingsToServer, worker, &polecommsthread::syncSettingsToServer, Qt::BlockingQueuedConnection);
+	this->connect(this, &Pole::syncSettingsToPole, worker, &polecommsthread::syncSettingsToPole, Qt::BlockingQueuedConnection);
+	this->connect(this, &Pole::StartRealtimeStream, worker, &polecommsthread::StartRealtimeStream, Qt::QueuedConnection);
+	this->connect(this, &Pole::EndRealtimeStream, worker, &polecommsthread::EndRealtimeStream, Qt::QueuedConnection);
 	_TCPListnerThread.start(QThread::HighestPriority);
 
 	startTCPThread();
@@ -118,7 +118,9 @@ void Pole::setUISelection(bool selected) {
 		// Start the realtime syncing of events data.
 		StartRealtimeStream();
 	}
-	else EndRealtimeStream();
+	else {EndRealtimeStream();}
+
+	//throw std::runtime_error("");
 
 }
 
