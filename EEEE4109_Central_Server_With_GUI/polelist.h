@@ -18,6 +18,8 @@ public:
 signals:
     void appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type);
 
+    Pole* getPoleByHWID(uint64_t HWID);
+
 private:
     std::pair<uint32_t, uint32_t> _TCPPortsRange;
     SOCKET UDPListener;
@@ -56,6 +58,10 @@ public slots:
 
     // From UDP listner thread.
     void appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type);
+
+    // From UDP listner thread.
+    Pole* getPoleByHWID(uint64_t HWID);
+    
 
     // From Pole class.
     void updateVisual(){ dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole }); }

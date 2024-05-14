@@ -16,9 +16,7 @@ Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, sockaddr_in poleAdd
 	// Configure the comms thread.
 	polecommsthread *worker = new polecommsthread(this, poleAddress, port);
 
-	//throw std::runtime_error("");
 	worker->moveToThread(&_TCPListnerThread);
-
 	
 	this->connect(worker, &polecommsthread::UpdatePoleConnectionStatus, this, &Pole::UpdatePoleConnectionStatus);
 	this->connect(worker, &polecommsthread::UpdatePoleEvents, this, &Pole::UpdatePoleEvents);
@@ -29,14 +27,11 @@ Pole::Pole(PoleDataModel* model, TreeViewHeader* parentItem, sockaddr_in poleAdd
 	this->connect(this, &Pole::syncSettingsToPole, worker, &polecommsthread::syncSettingsToPole, Qt::BlockingQueuedConnection);
 	this->connect(this, &Pole::StartRealtimeStream, worker, &polecommsthread::StartRealtimeStream, Qt::QueuedConnection);
 	this->connect(this, &Pole::EndRealtimeStream, worker, &polecommsthread::EndRealtimeStream, Qt::QueuedConnection);
+	this->connect(this, &Pole::getSocketPort, worker, &polecommsthread::getSocketPort, Qt::BlockingQueuedConnection);
+
 	_TCPListnerThread.start(QThread::HighestPriority);
 
 	startTCPThread();
-
-	//this->setProperty("height", QVariant(500));
-
-	
-	//_poleState.Events = syncEventsToServer();
 }
 
 Pole::~Pole() {
@@ -80,9 +75,9 @@ QVariant Pole::data(int column) const {
 	switch (column) {
 	case 0: return QVariant(("Pole " + std::to_string(_sessionId)).c_str());
 	case 1: return QVariant((std::to_string(_poleState.Sensors.batteryReading) + (const char*)"%").c_str());
-	case 2: return (_connstat == pcs::Connected) ? QVariant("Connected") : QVariant("Disconnected");
+	case 2: return (_connstat == pcs::Connected) ? QVariant("Connected") : (_connstat == pcs::Reconnecting) ? QVariant("Reconnecting") : (_connstat == pcs::Disconnected) ? QVariant("Disconnected") : QVariant("Connecting");
 	case 4: return (_Gate == nullptr) ? QVariant("No Gate") : QVariant(std::to_string(_Gate->getGatePosition()).c_str());
-	case 3: if (_Gate != nullptr) return (_Gate->getPartnerPole(this) == nullptr) ? QVariant("None") : QVariant(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str());
+	case 3: return (_Gate == nullptr) ? QVariant("None") : (_Gate->getPartnerPole(this) == nullptr) ? QVariant("None") : QVariant(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str());
 	}
 }
 
@@ -95,6 +90,21 @@ TreeViewHeader* Pole::parentItem() {
 
 void Pole::UpdatePoleConnectionStatus(pcs::PoleConnectionStatus connectionStatus) {
 	_connstat = connectionStatus;
+
+	if (_connstat & pcs::Reconnecting) {
+		emit syncSettingsToPole(_poleState.Settings);
+		if (_selected) StartRealtimeStream();
+
+		_connstat = pcs::Connected;
+	}
+
+	if (_connstat == pcs::Disconnected && _selected) {
+		grayOutPoleControls(true);
+	}
+
+	if (_connstat == pcs::Connected && _selected) {
+		grayOutPoleControls(false);
+	}
 	emit updatetreeVisual();
 }
 
@@ -106,7 +116,7 @@ void Pole::setUISelection(bool selected) {
 		(_poleType == PhotoDiodePole) ? VisualisePoleType(QString("Left")) : VisualisePoleType(QString("Right"));
 		VisualisePoleHWID(QString(std::to_string(_poleHWID).c_str()));
 
-		if (_Gate != nullptr) (_Gate->getPartnerPole(this) == nullptr) ? VisualisePolePartner(QString("None")) : VisualisePolePartner(QString(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str()));
+		(_Gate == nullptr) ? VisualisePolePartner(QString("None")) : (_Gate->getPartnerPole(this) == nullptr) ? VisualisePolePartner(QString("None")) : VisualisePolePartner(QString(std::to_string(_Gate->getPartnerPole(this)->getPoleSessionID()).c_str()));
 		VisualisePoleBattery(QString(std::to_string(_poleState.Sensors.batteryReading).c_str()));
 
 		(_Gate == nullptr) ? VisualisePoleGateNumber(QString("None")) : VisualisePoleGateNumber(QString(std::to_string(_Gate->getGatePosition()).c_str()));
@@ -115,13 +125,13 @@ void Pole::setUISelection(bool selected) {
 		VisualiseTouchSensitivity(QString(std::to_string((int)_poleState.Settings.velostatSensitivity*100).c_str()));
 		VisualiseIMUSensitivity(QString(std::to_string((int)_poleState.Settings.IMUSensitivity * 100).c_str()));
 
+		if (_connstat != pcs::Connected) grayOutPoleControls(true);
+		else grayOutPoleControls(false);
+
 		// Start the realtime syncing of events data.
 		StartRealtimeStream();
 	}
 	else {EndRealtimeStream();}
-
-	//throw std::runtime_error("");
-
 }
 
 void Pole::UpdatePoleEvents(events newEventsData) { 
@@ -132,6 +142,9 @@ void Pole::UpdatePoleEvents(events newEventsData) {
 
 void Pole::UpdatePoleSensors(sensors newSensorData) {
 	_poleState.Sensors = newSensorData;
+
+	// Update the UI to reflect the new readings if selected.
+	if (_selected) VisualisePoleBattery(QString(std::to_string(_poleState.Sensors.batteryReading).c_str()));
 
 	emit updatetreeVisual();
 };
@@ -149,16 +162,10 @@ void Pole::setVelostatSensitivity(float newSensitivity) {
 	_poleState.Settings.velostatSensitivity = newSensitivity;
 
 	syncSettingsToPole(_poleState.Settings);
-
-	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
-	if (_selected && _Gate != nullptr) { if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setVelostatSensitivity(newSensitivity); }
 }
 
 void Pole::setIMUSensitivity(float newSensitivity) {
 	_poleState.Settings.IMUSensitivity = newSensitivity;
 
 	syncSettingsToPole(_poleState.Settings);
-
-	// If this is the selected pole then tell the other pole to also adjust its Sensitivity.
-	if (_selected && _Gate != nullptr) { if (_Gate->getPartnerPole(this) != nullptr) _Gate->getPartnerPole(this)->setIMUSensitivity(newSensitivity); }
 }

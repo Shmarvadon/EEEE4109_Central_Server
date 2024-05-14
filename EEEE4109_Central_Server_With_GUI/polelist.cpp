@@ -6,6 +6,7 @@ PoleDataModel::PoleDataModel(int UDPListnerPort, std::pair<uint32_t, uint32_t> T
 	// Setup the UDP listner thread.
 	_UDPListnerThread = new udplistnerthread(this, this, UDPListnerPort, TCPPortRange);
 	connect(_UDPListnerThread, &udplistnerthread::appendNewPole, this, &PoleDataModel::appendNewPole);
+	connect(_UDPListnerThread, &udplistnerthread::getPoleByHWID, this, &PoleDataModel::getPoleByHWID, Qt::BlockingQueuedConnection);
 	_UDPListnerThread->start();
 }
 
@@ -82,6 +83,14 @@ void PoleDataModel::appendNewPole(sockaddr_in poleAddress, int port, uint64_t HW
 	endInsertRows();
 
 	//emit dataChanged(index(0, 0), index(rowCount(), columnCount()), { Qt::DecorationRole });
+}
+
+Pole* PoleDataModel::getPoleByHWID(uint64_t HWID) {
+	for (auto pole : _poles) {
+		if (pole->getPoleHWID() == HWID) return pole;
+	}
+
+	return nullptr;
 }
 
 bool PoleDataModel::findPartnerToPole(Pole* pPole) {
@@ -266,9 +275,9 @@ void udplistnerthread::run() {
 			}
 		}
 
-		//  Recieve the broadcast.
+		/*			Recieve the broadcast			*/	
 
-		uint32_t polePort = (_TCPPortsRange.first + _NumberOfPolesConncted < _TCPPortsRange.second) ? _TCPPortsRange.first + _NumberOfPolesConncted : throw std::runtime_error("Ran out of valid TCP ports to use.");
+		uint32_t polePort;
 
 		// Obtain the poles HWID.
 		uint64_t poleHWID;
@@ -277,13 +286,30 @@ void udplistnerthread::run() {
 		// Obtain the poles type.
 		uint8_t poleType = listnerBuff[8];
 
-		// Pack reply data into buffer.
-		memcpy(senderBuff, &polePort, sizeof(uint32_t));
-
+		// Set the address to reply to.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;
 
-		// Emit a signal to queue up the operation of appending the new pole to the _poles vector in the data model.
-		emit appendNewPole(senderRecieverAddress, polePort, poleHWID, poleType);
+		// Check if the pole is one already connected attempting to reconnect.
+		{
+			Pole* pPole = getPoleByHWID(poleHWID);
+
+			// If the pole has already been connected this session then we tell it which port to say hi to.
+			if (pPole != nullptr) {
+				polePort = pPole->getSocketPort();
+			}
+			// If the pole has not been connected before in this session then we assign it to a new instance of the Pole class to handle it.
+			else {
+				polePort = (_TCPPortsRange.first + _NumberOfPolesConncted < _TCPPortsRange.second) ? _TCPPortsRange.first + _NumberOfPolesConncted : throw std::runtime_error("Ran out of valid TCP ports to use.");
+				
+				// Emit a signal to queue up the operation of appending the new pole to the _poles vector in the data model.
+				emit appendNewPole(senderRecieverAddress, polePort, poleHWID, poleType);
+
+				_NumberOfPolesConncted++;
+			}
+		}
+
+		// Pack reply data into buffer.
+		memcpy(senderBuff, &polePort, sizeof(uint32_t));
 
 		// Send the reply.
 		senderRecieverAddress.sin_addr.s_addr = listnerSenderAddress.sin_addr.S_un.S_addr;
@@ -292,8 +318,6 @@ void udplistnerthread::run() {
 			WSACleanup();
 			throw std::runtime_error("Unable to send data over UDP socket.");
 		}
-
-		_NumberOfPolesConncted++;
 	}
 
 	/*   Thread termination cleanup   */

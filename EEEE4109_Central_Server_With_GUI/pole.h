@@ -19,6 +19,7 @@
 #include "gate.h"
 
 #define COMMS_BUFF_SIZE 512
+#define MAX_COMMS_RETRIES 5
 
 class PoleDataModel;
 class Pole;
@@ -130,7 +131,7 @@ class polecommsthread : public QObject {
 	Q_OBJECT
 
 public:
-	explicit polecommsthread(QObject* parent, sockaddr_in poleAddress, int Port) : _Port(Port), _RealtimeStreamEnabled(false), _Dest(poleAddress) {};
+	explicit polecommsthread(QObject* parent, sockaddr_in poleAddress, int Port) : _Port(Port), _RealtimeStreamEnabled(false), _Dest(poleAddress), _PoleConnected(pcs::Disconnected) {};
 	
 	void run();
 
@@ -148,6 +149,8 @@ public slots:
 	settings syncSettingsToServer();					// Needs to be blocking call.
 	bool syncSettingsToPole(settings newData);			// Needs to be blocking call.
 
+	int getSocketPort() { return _Port; }
+
 
 signals:
 
@@ -158,7 +161,7 @@ signals:
 private:
 
 	void _setupUDPConnection();
-	bool _pingPole();
+	void _pingPole();
 	void _setSocketBlockingMode(bool block, uint32_t timeout);
 
 	void _realtimeStreamingLoop();
@@ -170,6 +173,7 @@ private:
 	char _CommsBuffer[COMMS_BUFF_SIZE];
 	std::chrono::time_point<std::chrono::high_resolution_clock> lastSynced;
 	bool _RealtimeStreamEnabled;
+	pcs::PoleConnectionStatus _PoleConnected;
 	QTimer* _mainLoopTimer,
 		  * _realtimeStreamTimer;
 };
@@ -209,6 +213,8 @@ public:
 	//void		setPolePartner(Pole* partnerId) { (_poleType == LEDPole) ? _Gate->PhotodiodePole = partnerId : _Gate->LEDPole = partnerId; }
 	polestate*	getPoleState() { return &_poleState; }
 
+	uint64_t	getPoleHWID() { return _poleHWID; }
+
 	void		setIRFrequency(uint16_t newFreq);
 	void		setVelostatSensitivity(float newSensitivity);
 	void		setIMUSensitivity(float newSensitivity);
@@ -242,6 +248,8 @@ signals:
 	void StartRealtimeStream();
 	void EndRealtimeStream();
 
+	int getSocketPort();
+
 	// To PoleTreeView Data Model class.
 	void updatetreeVisual();
 	bool findPartnerPole(Pole* pPole);
@@ -261,6 +269,8 @@ signals:
 
 	void updatePoleEventsVisualIndicators(events eventsData);
 	void setPowerStateIndicator(pps::PolePowerState powerState);
+
+	void grayOutPoleControls(bool a);
 
 
 protected:

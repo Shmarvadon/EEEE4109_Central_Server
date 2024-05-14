@@ -25,10 +25,11 @@ uint32_t UDP_broadcast_Port = 42069;
 uint32_t Session_TCP_Port;
 String Server_IP_String;
 IPAddress Server_IP;
-char TCP_RecvBuffer[512];
-char TCP_SendBuffer[512];
-AsyncUDP udp;
-WiFiClient tcp;
+char Comms_Send_Buffer[512];
+
+AsyncUDP udp_handshaker;
+AsyncUDP udp_communicator;
+
 
 
 
@@ -95,8 +96,6 @@ void loop() {
   // Time the loop.
   auto loopStart = micros();
 
-  // Run the networking stuff.
-  Networking_Loop();
 
   // Run the IMU stuff if turned on.
   if (IMU_On) (IMU_Loop()) ? PoleStatus.Events |= IMUTriggered : PoleStatus.Events ^= IMUTriggered;
@@ -106,80 +105,90 @@ void loop() {
 
   // Time the loop.
   auto loopEnd = micros();
+  delayMicroseconds( 10000 -loopEnd + loopStart);
   Serial.println(loopEnd - loopStart);
 
 }
 
-void Networking_Loop(){
-  if (tcp.available() != 0){
+void On_Packet(AsyncUDPPacket packet){
 
-    memset(TCP_RecvBuffer,0, 512);
-    memset(TCP_SendBuffer,0, 512);
+  Serial.println("UDP packet recieved.");
 
-    int to_read = (tcp.available() < 512) ? tcp.available() : 512;
-    for (int i = 0; i < to_read; i++) TCP_RecvBuffer[i] = tcp.read();
-    //int i = 0;
-    //while (tcp.available() > 0) {TCP_RecvBuffer[i] = tcp.read(); i++;}
+  uint8_t* data = packet.data();
 
-    // If the server pings.
-    if (TCP_RecvBuffer[0] & ptt::Ping){
-      tcp.write((char)130);
+  Serial.println(data[0]);
 
+  // If the server pings.
+  if (data[0] & ptt::Ping){
+      //udp_communicator.write((char)130);
+
+      Comms_Send_Buffer[0] = (char)130;
+
+
+      udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 1, packet.remoteIP(), packet.remotePort());
+
+
+      Serial.println("Recieved ping from server");
       return;
-      //Serial.println("Recieved ping from server");
     }
 
     // If the server asks for events.
-    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Events)){
+    if (data[0] == (ptt::SyncToServer | ptt::Events)){
       //Serial.println("Server has asked for sync of events.");
-      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
-      TCP_SendBuffer[1] = PoleStatus.Events;
-      tcp.write(TCP_SendBuffer);
+      Comms_Send_Buffer[0] = data[0];
+      Comms_Send_Buffer[1] = PoleStatus.Events;
+      //udp_communicator.write((uint8_t*)Comms_Send_Buffer, sizeof(char) * 2);
+      udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 2, packet.remoteIP(), packet.remotePort());
 
+      Serial.println("Server asked for events");
       return;
     }
 
     // If the server asks for a copy of the sensor values.
-    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Sensors)){
-      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
-      memcpy(&TCP_SendBuffer[1], &PoleStatus.Sensors.velostatReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[5], &PoleStatus.Sensors.IRGateReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[9], &PoleStatus.Sensors.IRCameraReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[13], &PoleStatus.Sensors.IMUReading, sizeof(float));
-      memcpy(&TCP_SendBuffer[17], &PoleStatus.Sensors.batteryReading, sizeof(int));
-      tcp.write(TCP_SendBuffer);
+    if (data[0] == (ptt::SyncToServer | ptt::Sensors)){
+      Comms_Send_Buffer[0] = data[0];
+      memcpy(&Comms_Send_Buffer[1], &PoleStatus.Sensors.velostatReading, sizeof(float));
+      memcpy(&Comms_Send_Buffer[5], &PoleStatus.Sensors.IRGateReading, sizeof(float));
+      memcpy(&Comms_Send_Buffer[9], &PoleStatus.Sensors.IRCameraReading, sizeof(float));
+      memcpy(&Comms_Send_Buffer[13], &PoleStatus.Sensors.IMUReading, sizeof(float));
+      memcpy(&Comms_Send_Buffer[17], &PoleStatus.Sensors.batteryReading, sizeof(int));
+      //udp_communicator.write((uint8_t*)Comms_Send_Buffer, sizeof(char) * 18);
+      udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 18, packet.remoteIP(), packet.remotePort());
+
+      Serial.println("Server asked for sensor readings");
 
       return;
     }
 
     // If the server asks for a copy of the settings.
-    if (TCP_RecvBuffer[0] == (ptt::SyncToServer | ptt::Configurables)){
-      TCP_SendBuffer[0] = TCP_RecvBuffer[0];
-      memcpy(&TCP_SendBuffer[1], &PoleStatus.Settings.IRTransmitFreq, sizeof(uint16_t));
-      memcpy(&TCP_SendBuffer[3], &PoleStatus.Settings.IMUSensitivity, sizeof(float));
-      memcpy(&TCP_SendBuffer[7], &PoleStatus.Settings.velostatSensitivity, sizeof(float));
-      memcpy(&TCP_SendBuffer[11], &PoleStatus.Settings.powerState, sizeof(uint8_t));
+    if (data[0] == (ptt::SyncToServer | ptt::Configurables)){
+      Comms_Send_Buffer[0] = data[0];
+      memcpy(&Comms_Send_Buffer[1], &PoleStatus.Settings.IRTransmitFreq, sizeof(uint16_t));
+      memcpy(&Comms_Send_Buffer[3], &PoleStatus.Settings.IMUSensitivity, sizeof(float));
+      memcpy(&Comms_Send_Buffer[7], &PoleStatus.Settings.velostatSensitivity, sizeof(float));
+      memcpy(&Comms_Send_Buffer[11], &PoleStatus.Settings.powerState, sizeof(uint8_t));
 
-      tcp.write(TCP_SendBuffer);
+      //udp_communicator.write((uint8_t*)Comms_Send_Buffer, 12);
+      udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 12, packet.remoteIP(), packet.remotePort());
 
+      Serial.println("Server asked for settings");
       return;
     }
 
     // If the server sends updated settings.
-    if (TCP_RecvBuffer[0] == (ptt::SyncToPole | ptt::Configurables)){
-      memcpy(&PoleStatus.Settings.IRTransmitFreq, &TCP_RecvBuffer[1], sizeof(uint16_t));
-      memcpy(&PoleStatus.Settings.IMUSensitivity, &TCP_RecvBuffer[3], sizeof(float));
-      memcpy(&PoleStatus.Settings.velostatSensitivity, &TCP_RecvBuffer[7], sizeof(float));
-      memcpy(&PoleStatus.Settings.powerState, &TCP_RecvBuffer[11], sizeof(uint8_t));
+    if (data[0] == (ptt::SyncToPole | ptt::Configurables)){
+      memcpy(&PoleStatus.Settings.IRTransmitFreq, &data[1], sizeof(uint16_t));
+      memcpy(&PoleStatus.Settings.IMUSensitivity, &data[3], sizeof(float));
+      memcpy(&PoleStatus.Settings.velostatSensitivity, &data[7], sizeof(float));
+      memcpy(&PoleStatus.Settings.powerState, &data[11], sizeof(uint8_t));
+
+      Serial.println("Server sent settings");
 
       // Call function to update power state stuffs.
       UpdatePowerState();
 
       return;
     }
-
-    //tcp.flush();
-  }
 }
 
 bool IMU_Loop(){
@@ -344,8 +353,8 @@ void SetupWiFi(){
   Serial.println((String)"RSSI: " + WiFi.RSSI());
 
   // Setup UDP socket for broadcast.
-  if (udp.connect(IPAddress(255,255,255,255), UDP_broadcast_Port)){
-    udp.onPacket([](AsyncUDPPacket packet){
+  if (udp_handshaker.connect(IPAddress(255,255,255,255), UDP_broadcast_Port)){
+    udp_handshaker.onPacket([](AsyncUDPPacket packet){
 
       // Recieve UDP handshake reply from server and extract data from it.
       Serial.println("Recieved a UDP packet.");
@@ -354,27 +363,14 @@ void SetupWiFi(){
       Serial.println(packet.remoteIP().toString());
       Server_IP_String = packet.remoteIP().toString();
       Server_IP.fromString(Server_IP_String);
-
-      UDP_broadcast_Successful = true;
-
-      // Attempt to setup TCP connection.
-      for (int i = 0; i < 20; i++){
-        delay(100);
-        if(tcp.connect(Server_IP, Session_TCP_Port)){
-          Serial.println("TCP connection successful.");
-          return;
-        }
-        else{
-          Serial.println("TCP connection unsuccessful.");
-        }
-      }
       
+      UDP_broadcast_Successful = true;
     });
   }
 
-  if (!udp.listen(UDP_broadcast_Port-1)){
-      Serial.println("Unable to setup UDP socket to listen for server reply.");
-      exit(0);
+  if (!udp_handshaker.listen(UDP_broadcast_Port-1)){
+    Serial.println("Unable to setup UDP socket to listen for server reply.");
+    exit(0);
   }
 
   while (!UDP_broadcast_Successful){
@@ -383,15 +379,24 @@ void SetupWiFi(){
     Serial.println("Sending UDP broadcast Now.");
 
     // Populate buffer with information.
-    TCP_RecvBuffer[0] = POLE_HWID;
-    TCP_RecvBuffer[8] = POLE_TYPE;
+    Comms_Send_Buffer[0] = POLE_HWID;
+    Comms_Send_Buffer[8] = POLE_TYPE;
 
     // Send the UDP broadcast.
-    udp.broadcastTo((uint8_t*)&TCP_RecvBuffer, (size_t)512, (uint16_t)UDP_broadcast_Port);
+    udp_handshaker.broadcastTo((uint8_t*)&Comms_Send_Buffer, (size_t)512, (uint16_t)UDP_broadcast_Port);
     delay(1000);
 
   }
-  Serial.println("UDP handshake with server successful. TCP connection established.");
+
+  udp_handshaker.close();
+
+  if (udp_communicator.connect(Server_IP.fromString(Server_IP_String), Session_TCP_Port)){
+    udp_communicator.onPacket(On_Packet);
+    Serial.println("Setup UDP socket to listen for messages from server.");
+  }
+
+  if (!udp_communicator.listen(Session_TCP_Port)) {Serial.println("Unable to listen for incoming UDP packets.");}
+  Serial.println("UDP handshake with server successful. long living connection established.");
 }
 
 void Setup_IMU(){

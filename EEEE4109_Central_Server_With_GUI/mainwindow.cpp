@@ -60,8 +60,6 @@ void MainWindow::handleTreeViewClicked() {
     QModelIndex selectedIndex = _ui->treeView->currentIndex();
     _ui->PoleStatusViewSection->setCurrentIndex(1);
 
-    //throw std::runtime_error("");
-
     Pole* pPole = static_cast<Pole*>(selectedIndex.internalPointer());
 
     if (pPole->getPoleType() == (uint8_t)LEDPole)   _ui->PoleDiagramView->setCurrentIndex(0);
@@ -112,6 +110,8 @@ void MainWindow::handleTreeViewClicked() {
     connect(pPole, &Pole::setPowerStateIndicator, this, &MainWindow::setPowerStateIndicator);
 
     //throw std::runtime_error("");
+
+    connect(pPole, &Pole::grayOutPoleControls, this, &MainWindow::grayOutPoleControls);
 
     // Tell the selected pole to set things up.
     pPole->setUISelection(true);
@@ -174,3 +174,5 @@ void MainWindow::handleGateNumberInput() {
     if (_currentlySelectedPole->getGate() != nullptr)  _currentlySelectedPole->getGate()->setGatePosition(_ui->GateNumberInputBox->text().toInt());
 
 }
+
+void MainWindow::grayOutPoleControls(bool a) { (a) ? _ui->PoleStatusViewSection->setEnabled(false) : _ui->PoleStatusViewSection->setEnabled(true); };

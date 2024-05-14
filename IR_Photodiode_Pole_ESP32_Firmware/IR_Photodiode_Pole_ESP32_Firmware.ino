@@ -70,7 +70,7 @@ void setup() {
   Serial.begin(115200);
 
   // Setup the IMU.
-  //Setup_IMU();
+  Setup_IMU();
 
   // Setup the photodiodes.
   Setup_IR_Photodiodes();
@@ -82,7 +82,7 @@ void setup() {
   SetupWiFi();
 
 
-  PoleStatus.Events = VelostatTriggered;
+  //PoleStatus.Events = VelostatTriggered;
 
 
   // Set I2C to 400khz.
@@ -105,8 +105,8 @@ void loop() {
 
   // Time the loop.
   auto loopEnd = micros();
+  delayMicroseconds( 10000 -loopEnd + loopStart);
   //Serial.println(loopEnd - loopStart);
-
 }
 
 void On_Packet(AsyncUDPPacket packet){
@@ -129,7 +129,6 @@ void On_Packet(AsyncUDPPacket packet){
 
       Serial.println("Recieved ping from server");
       return;
-      //Serial.println("Recieved ping from server");
     }
 
     // If the server asks for events.
@@ -140,6 +139,7 @@ void On_Packet(AsyncUDPPacket packet){
       //udp_communicator.write((uint8_t*)Comms_Send_Buffer, sizeof(char) * 2);
       udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 2, packet.remoteIP(), packet.remotePort());
 
+      Serial.println("Server asked for events");
       return;
     }
 
@@ -153,6 +153,8 @@ void On_Packet(AsyncUDPPacket packet){
       memcpy(&Comms_Send_Buffer[17], &PoleStatus.Sensors.batteryReading, sizeof(int));
       //udp_communicator.write((uint8_t*)Comms_Send_Buffer, sizeof(char) * 18);
       udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 18, packet.remoteIP(), packet.remotePort());
+
+      Serial.println("Server asked for sensor readings");
 
       return;
     }
@@ -168,6 +170,7 @@ void On_Packet(AsyncUDPPacket packet){
       //udp_communicator.write((uint8_t*)Comms_Send_Buffer, 12);
       udp_communicator.writeTo((uint8_t*)Comms_Send_Buffer, 12, packet.remoteIP(), packet.remotePort());
 
+      Serial.println("Server asked for settings");
       return;
     }
 
@@ -177,6 +180,8 @@ void On_Packet(AsyncUDPPacket packet){
       memcpy(&PoleStatus.Settings.IMUSensitivity, &data[3], sizeof(float));
       memcpy(&PoleStatus.Settings.velostatSensitivity, &data[7], sizeof(float));
       memcpy(&PoleStatus.Settings.powerState, &data[11], sizeof(uint8_t));
+
+      Serial.println("Server sent settings");
 
       // Call function to update power state stuffs.
       UpdatePowerState();

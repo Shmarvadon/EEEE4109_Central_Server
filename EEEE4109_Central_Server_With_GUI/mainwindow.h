@@ -40,6 +40,7 @@ public slots:
     void updatePoleEventsVisualIndicators(events eventsdata);
     void setPowerStateIndicator(pps::PolePowerState powerState);
 
+    void grayOutPoleControls(bool a);
 
 private:
     Ui::MainWindow *_ui;
