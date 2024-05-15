@@ -2,32 +2,10 @@
 
 #include "pole.h"
 
-#define UDP_BUFF_SIZE 512
 
 class PoleDataModel;
 class Pole;
 class Gate;
-
-class udplistnerthread : public QThread {
-    Q_OBJECT
-public:
-
-        explicit udplistnerthread(PoleDataModel* model, QObject* parent, int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange) : QThread(parent), _UDPListnerPort(UDPListnerPort), _TCPPortsRange(TCPPortRange), _NumberOfPolesConncted(0), _Model(model) {};
-        void run() override;
-
-signals:
-    void appendNewPole(sockaddr_in poleAddress, int port, uint64_t HWID, uint8_t type);
-
-    Pole* getPoleByHWID(uint64_t HWID);
-
-private:
-    std::pair<uint32_t, uint32_t> _TCPPortsRange;
-    SOCKET UDPListener;
-    SOCKET UDPSender;
-    int _UDPListnerPort;
-    int _NumberOfPolesConncted;
-    PoleDataModel* _Model;
-};
 
 class PoleDataModel : public QAbstractItemModel {
 
@@ -37,7 +15,7 @@ public:
     Q_DISABLE_COPY_MOVE(PoleDataModel)
 
     /*			Constructors			*/
-    PoleDataModel(int UDPListnerPort, std::pair<uint32_t, uint32_t> TCPPortRange);
+    PoleDataModel();
 	~PoleDataModel();
 
     /*			QT methods			*/
@@ -80,7 +58,6 @@ private:
 
     std::vector<Pole*> _poles;
     std::vector<Gate*> _Gates;
-    udplistnerthread* _UDPListnerThread;
 };
 
 class TreeViewHeader : public QObject {

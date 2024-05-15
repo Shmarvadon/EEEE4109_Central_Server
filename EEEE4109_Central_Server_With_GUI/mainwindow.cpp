@@ -8,11 +8,17 @@ MainWindow::MainWindow(QWidget *parent)
     _ui->setupUi(this);
 
     /*          Set up the UI stuffs            */    
-    this->_poleList = new PoleDataModel( 42069, {2000,3000});
+    this->_poleList = new PoleDataModel();
 
     _ui->treeView->setModel(this->_poleList);
     _ui->treeView->header()->setSectionResizeMode(QHeaderView::Fixed);
     _ui->treeView->setStyleSheet("QTreeView::item { border: none ; border-style: solid ; border-color: lightgray ;}");
+
+    // Setup the UDP listner thread.
+    _UDPListnerThread = new udplistnerthread(this, 42069, {2000,3000});
+    connect(_UDPListnerThread, &udplistnerthread::appendNewPole, _poleList, &PoleDataModel::appendNewPole);
+    connect(_UDPListnerThread, &udplistnerthread::getPoleByHWID, _poleList, &PoleDataModel::getPoleByHWID, Qt::BlockingQueuedConnection);
+    _UDPListnerThread->start();
 
 
     connect(_ui->treeView, &QTreeView::clicked, this, &MainWindow::handleTreeViewClicked);

@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include "polelist.h"
+#include "udplistnerthread.h"
 
 
 #include <QDebug>
@@ -46,5 +47,6 @@ private:
     Ui::MainWindow *_ui;
     PoleDataModel* _poleList;
     Pole* _currentlySelectedPole = nullptr;
+    udplistnerthread* _UDPListnerThread;
 };
 #endif // MAINWINDOW_H
