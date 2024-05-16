@@ -90,6 +90,10 @@ void setup() {
 
   // Set I2C to 400khz.
   Wire.setClock(400000);
+
+  Run_LEDs(10000, 40, 1300);
+  PoleStatus.Settings.IMUSensitivity = 0.3;
+  PoleStatus.Settings.velostatSensitivity = 0.3;
 }
 
 void loop() {
@@ -106,7 +110,7 @@ void loop() {
   // Time the loop.
   auto loopEnd = micros();
   delayMicroseconds( 10000 -loopEnd + loopStart);
-  Serial.println(loopEnd - loopStart);
+  //Serial.println(loopEnd - loopStart);
 
 }
 

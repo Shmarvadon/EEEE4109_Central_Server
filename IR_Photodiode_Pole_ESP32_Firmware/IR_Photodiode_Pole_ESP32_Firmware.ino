@@ -18,8 +18,8 @@ polestate PoleStatus;
 
 
 /*      NETWORK COMMS STUFF     */
-const char* ssid = "network21iot";
-const char* password = "RCD-M40DAB";
+const char* ssid = "Pixel_8155";
+const char* password = "password";
 
 bool UDP_broadcast_Successful = false;
 uint32_t UDP_broadcast_Port = 42069;
@@ -82,7 +82,9 @@ void setup() {
   SetupWiFi();
 
 
-  //PoleStatus.Events = VelostatTriggered;
+  PoleStatus.Settings.IRTransmitFreq = 10000;
+  PoleStatus.Settings.IMUSensitivity = 0.3;
+  PoleStatus.Settings.velostatSensitivity = 0.3;
 
 
   // Set I2C to 400khz.
