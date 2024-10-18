@@ -1,34 +1,23 @@
-#include "WiFi.h"
-#include "AsyncUDP.h"
+//#include "WiFi.h"
+//#include "AsyncUDP.h"
+#include "../comms.hpp"
 #include <driver/adc.h>
 #include <driver/i2s.h>
-#include <Adafruit_ICM20948.h>
+#include <../imu.hpp>
 #include <CircularBuffer.hpp>
-#include "PoleStateDataStructures.h"
+//#include "../../PoleStateDataStructures.h"
+#include "../../PoleState.hpp"
 #include <driver/dac_continuous.h>
 
 
 /*      MISCELLANEOUS GLOBAL VARIABLES & DEFINES      */
 #define POLE_HWID 0
 #define POLE_TYPE (uint8_t)1
-polestate PoleStatus;
+polestate PoleState;
 
 
 
-/*      NETWORK COMMS STUFF     */
-const char* ssid = "network21iot";
-const char* password = "RCD-M40DAB";
 
-bool UDP_broadcast_Successful = false;
-uint32_t UDP_broadcast_Port = 42069;
-
-uint32_t Session_TCP_Port;
-String Server_IP_String;
-IPAddress Server_IP;
-char Comms_Send_Buffer[512];
-
-AsyncUDP udp_handshaker;
-AsyncUDP udp_communicator;
 
 
 
@@ -37,15 +26,6 @@ AsyncUDP udp_communicator;
 uint8_t IR_LED_WaveForm[80];
 dac_continuous_handle_t* IR_LED_DMA_Handle = nullptr;
 bool IR_Beam_On = false;
-
-
-
-/*      IMU STUFF     */
-Adafruit_ICM20948 icm;
-Adafruit_Sensor *accelerometer;
-CircularBuffer<float,100> ICM_Accel_Readings;
-float Processed_IMU_Readings[100];
-bool IMU_On = true;
 
 
 
@@ -72,48 +52,6 @@ int16_t IR_Camera_Weightings[8] = {-4, -3, -2, -1, 1, 2, 3, 4};
 
 
 /*      CODE AND OTHER STUFF      */
-
-
-void setup() {
-
-  // Setup serial.
-  Serial.begin(115200);
-
-  // Setup the IMU.
-  Setup_IMU();
-
-  // Setup the Velostat.
-  Setup_Velostat(10);
-
-  // Setup the WiFi.
-  SetupWiFi();
-
-  // Set I2C to 400khz.
-  Wire.setClock(400000);
-
-  Run_LEDs(10000, 40, 1300);
-  PoleStatus.Settings.IMUSensitivity = 0.3;
-  PoleStatus.Settings.velostatSensitivity = 0.3;
-}
-
-void loop() {
-  // Time the loop.
-  auto loopStart = micros();
-
-
-  // Run the IMU stuff if turned on.
-  if (IMU_On) (IMU_Loop()) ? PoleStatus.Events |= IMUTriggered : PoleStatus.Events ^= IMUTriggered;
-
-  // Run the Velostat stuff if turned on.
-  if (Velostat_On) (Velostat_Loop()) ? PoleStatus.Events |= VelostatTriggered : PoleStatus.Events ^= VelostatTriggered;
-
-  // Time the loop.
-  auto loopEnd = micros();
-  delayMicroseconds( 10000 -loopEnd + loopStart);
-  //Serial.println(loopEnd - loopStart);
-
-}
-
 void On_Packet(AsyncUDPPacket packet){
 
   Serial.println("UDP packet recieved.");
@@ -195,34 +133,44 @@ void On_Packet(AsyncUDPPacket packet){
     }
 }
 
-bool IMU_Loop(){
+void setup() {
 
-  // Get updated values from IMU.
-  sensors_event_t accel;
-  accelerometer->getEvent(&accel);
+  // Setup serial.
+  Serial.begin(115200);
 
-  float val = sqrt((accel.acceleration.x * accel.acceleration.x) + (accel.acceleration.y * accel.acceleration.y) + (accel.acceleration.z * accel.acceleration.z));
-  ICM_Accel_Readings.push(val);
+  // Setup the IMU.
+  Setup_IMU();
 
-  float mean = 0;
-  float variance = 0;
-  // Calculate the mean and variance.
-  if (ICM_Accel_Readings.isFull()) {
-    for (int i = 0; i < 100; i++){
-      mean += ICM_Accel_Readings[i];
-    }
+  // Setup the Velostat.
+  Setup_Velostat(10);
 
-    mean = mean / 100;
+  // Setup the WiFi.
+  SetupWiFi(&On_Packet, POLE_HWID, POLE_TYPE);
 
-    for (int i = 0; i < 100; i++){
-      variance += (ICM_Accel_Readings[i] - mean) * (ICM_Accel_Readings[i] - mean);
-    }
+  // Set I2C to 400khz.
+  Wire.setClock(400000);
 
-    variance = variance / 100;
+  Run_LEDs(10000, 40, 1300);
+  PoleStatus.Settings.IMUSensitivity = 0.3;
+  PoleStatus.Settings.velostatSensitivity = 0.3;
+}
 
-    if (variance > PoleStatus.Settings.IMUSensitivity) return true;
-    else return false;
-  }
+void loop() {
+  // Time the loop.
+  auto loopStart = micros();
+
+
+  // Run the IMU stuff if turned on.
+  if (IMU_On) (IMU_Loop()) ? PoleStatus.Events |= IMUTriggered : PoleStatus.Events ^= IMUTriggered;
+
+  // Run the Velostat stuff if turned on.
+  if (Velostat_On) (Velostat_Loop()) ? PoleStatus.Events |= VelostatTriggered : PoleStatus.Events ^= VelostatTriggered;
+
+  // Time the loop.
+  auto loopEnd = micros();
+  delayMicroseconds( 10000 -loopEnd + loopStart);
+  //Serial.println(loopEnd - loopStart);
+
 }
 
 bool Velostat_Loop(){
@@ -278,7 +226,7 @@ void IR_Camera_Loop(){
   {
     float sum = 0;
     for (int i = 0; i < 8; i++){
-      sum += IR_Camera_Weighting[i] * IR_Camera_Pixel_Data[i];
+      sum += IR_Camera_Weightings[i] * IR_Camera_Pixel_Data[i];
     }
 
     IR_Camers_Readings.push(sum);
@@ -335,82 +283,7 @@ void Stop_LEDs(){
 
 }
 
-void SetupWiFi(){
-  // Setup WiFi Connection.
-  WiFi.begin(ssid, password);
 
-  Serial.print("Connecting to WiFi");
-  while(WiFi.status() != WL_CONNECTED){
-    delay(200);
-    Serial.print(".");
-  }
-  Serial.println();
-
-  // Print connection info to terminal.
-  Serial.println("Connected To WiFi.");
-  Serial.print("Gateway: ");
-  Serial.println(WiFi.gatewayIP());
-  Serial.print("Subnet Mask: ");
-  Serial.println(WiFi.subnetMask());
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
-  Serial.println((String)"RSSI: " + WiFi.RSSI());
-
-  // Setup UDP socket for broadcast.
-  if (udp_handshaker.connect(IPAddress(255,255,255,255), UDP_broadcast_Port)){
-    udp_handshaker.onPacket([](AsyncUDPPacket packet){
-
-      // Recieve UDP handshake reply from server and extract data from it.
-      Serial.println("Recieved a UDP packet.");
-      memcpy(&Session_TCP_Port, packet.data(), sizeof(uint32_t));
-      Serial.println(Session_TCP_Port);
-      Serial.println(packet.remoteIP().toString());
-      Server_IP_String = packet.remoteIP().toString();
-      Server_IP.fromString(Server_IP_String);
-      
-      UDP_broadcast_Successful = true;
-    });
-  }
-
-  if (!udp_handshaker.listen(UDP_broadcast_Port-1)){
-    Serial.println("Unable to setup UDP socket to listen for server reply.");
-    exit(0);
-  }
-
-  while (!UDP_broadcast_Successful){
-    // Loop over sending out a broadcast with the poles HWID & Pole type information.
-
-    Serial.println("Sending UDP broadcast Now.");
-
-    // Populate buffer with information.
-    Comms_Send_Buffer[0] = POLE_HWID;
-    Comms_Send_Buffer[8] = POLE_TYPE;
-
-    // Send the UDP broadcast.
-    udp_handshaker.broadcastTo((uint8_t*)&Comms_Send_Buffer, (size_t)512, (uint16_t)UDP_broadcast_Port);
-    delay(1000);
-
-  }
-
-  udp_handshaker.close();
-
-  if (udp_communicator.connect(Server_IP.fromString(Server_IP_String), Session_TCP_Port)){
-    udp_communicator.onPacket(On_Packet);
-    Serial.println("Setup UDP socket to listen for messages from server.");
-  }
-
-  if (!udp_communicator.listen(Session_TCP_Port)) {Serial.println("Unable to listen for incoming UDP packets.");}
-  Serial.println("UDP handshake with server successful. long living connection established.");
-}
-
-void Setup_IMU(){
-  if (!icm.begin_I2C(104)){ Serial.println("Failed to find ICM chip on I2C bus."); while (true) delay(10);}
-  Serial.println("Found ICM chip!");
-  icm.setAccelRateDivisor(0);
-
-  accelerometer = icm.getAccelerometerSensor();
-
-}
 
 void Setup_Velostat(int Current){
   dacWrite(25, (255 * Current) / 3300);
